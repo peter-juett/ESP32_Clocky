@@ -36,7 +36,7 @@ To use Clocky, you will need the following:
 - Sensors such as SHT31, DHT11/DHT22 for temperature and humidity sensing.
 - LED matrix display compatible with the MD_MAX72XX library.
 - Arduino IDE for development.
-- Necessary libraries (listed in the project's documentation).
+- Necessary libraries (see the "Installed Libraries" file for details).
 
 ## Setup
 
