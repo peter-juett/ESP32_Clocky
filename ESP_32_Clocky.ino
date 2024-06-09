@@ -1487,7 +1487,7 @@ void checkIR() {
              Beep();    
          }
 
-         if (setupStep==SETUP_STEP_ALARM && setupSubstep!=SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME)
+         if (setupStep==SETUP_STEP_ALARM && setupSubstep==SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME)
          {
             if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_0])
                 AddToAlarmString("0");
