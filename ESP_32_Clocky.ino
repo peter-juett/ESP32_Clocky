@@ -101,10 +101,10 @@ const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "Alarm Motion Off?";
 const char* DISPLAY_MSG_PIR = "PIR";
 const char* DISPLAY_MSG_LED_MOTION_ON  = "LED Motion On?";
 const char* DISPLAY_MSG_LED_MOTION_OFF  = "LED Motion Off?";
-const char* DISPLAY_MSG_12_24_HR = "12|24?";
-const char* DISPLAY_MSG_WIFI = "Wi-Fi?";
+const char* DISPLAY_MSG_12_24_HR = "12|24";
+const char* DISPLAY_MSG_WIFI = "Wi-Fi";
 const char* DISPLAY_MSG_RESET = "Reset?";
-const char* DISPLAY_MSG_C_F = "C/F?";
+const char* DISPLAY_MSG_C_F = "C/F";
 const char* DISPLAY_MSG_C = "C?";
 const char* DISPLAY_MSG_F = "F?";
 const char* DISPLAY_MSG_ZONE = "Zone?";
@@ -138,7 +138,7 @@ const int SETUP_STEP_PIR = 5;
 const int SETUP_STEP_ZONE = 6;
 const int SETUP_STEP_EXIT = 7;
 
-const int SETUP_SUBSTEPS[8] = {0,3,2,1,2,2,3,0};
+const int SETUP_SUBSTEPS[8] = {0,3,1,1,1,2,3,0};
 
 const int SETUP_MAX = 7; 
 
@@ -200,7 +200,7 @@ WiFiManager wifiManager; // Initialize WiFiManager
 
 int currentMode;
 
-int hour24 = 1;
+int hour24;
 int intensity;
 
 TaskHandle_t DisplayTask_Handle, TriggerTask_Handle;
@@ -279,10 +279,10 @@ void getTemperature()
 {
   if (temperature_sensor == SHT31)
   {
-    if (celsius)
+    if (celsius==1)
       sprintf(displayTemperature, "%.1f%cC", sht31.readTemperature(), DEGREE_CHARACTER);
     else
-      sprintf(displayTemperature, "%.1f%cF", ConvertTemperatureToF(sht31.readTemperature()), DEGREE_CHARACTER);
+      sprintf(displayTemperature, "%.0f%cF", ConvertTemperatureToF(sht31.readTemperature()), DEGREE_CHARACTER);
   }
    else
   {
@@ -1106,6 +1106,15 @@ void SaveLEDMotionOn()
     preferences.end();
 }
 
+void Save12_24Hour()
+{  
+    preferences.begin("Settings", false);
+    preferences.putInt("hour24", hour24); 
+    Serial.println("hour24 has been Saved");
+    Serial.println(hour24);
+    preferences.end();
+}
+
 void GetIntensity()
 { 
     preferences.begin("Settings", false);
@@ -1127,6 +1136,15 @@ void GetTimeZone()
     preferences.begin("Settings", false);
     timeZone = preferences.getString("timezone", "JST-9"); 
     Serial.println("TimeZone been retrieved -" + timeZone);
+    preferences.end();
+}
+
+void Get12_24Hour()
+{ 
+    preferences.begin("Settings", false);
+    hour24 = preferences.getInt("hour24", 1);
+    Serial.println("12_24 hour has been loaded");
+    Serial.println(hour24);
     preferences.end();
 }
 
@@ -1199,7 +1217,8 @@ void SetSaveandDisplayMode(int newMode, bool SaveMode = true)
 
 bool ValidateAlarmStringAddition(String newChar)
 {
-  if (alarmString.length() == 0) {
+  if (alarmString.length() == 0) 
+  {
     switch (newChar.charAt(0)) { // Consider only the first character
       case '0':
       case '1':
@@ -1278,9 +1297,7 @@ void ShowOK()
 void DeleteFromAlarmString()
 {
   if(alarmString.length()>0)
-  {
     alarmString.remove(alarmString.length() - 1); // Removes the last character from the string
-  }
   else
   {
     Beep();
@@ -1288,9 +1305,7 @@ void DeleteFromAlarmString()
   }
 
   if(alarmString.length()==3 || alarmString.length()==6) //remove the : or ? as well..
-  {
     alarmString.remove(alarmString.length() - 1); // Removes the last character from the string
-  }
 }
 
 bool isValueInArray(unsigned long value) {
@@ -1389,35 +1404,30 @@ void checkIR() {
                 ShowOK();
               }
            }
-           else if (setupStep==SETUP_STEP_12_24)
-              {
-                if (setupSubstep==1)
-                {
-                  hour24 = 0;
-                  ShowOK();
-                }
-                else if (setupSubstep==2)
-                {
-                  hour24 = 1;
-                  ShowOK();
-                }
-              }
-              else if (setupStep==SETUP_STEP_WIFI && setupSubstep==1)
-              {
-                 wifiManager.resetSettings();
-                 ShowOK();
-                 ESP.restart();
-              }
-            else if (setupStep==SETUP_STEP_C_F)
-              {
-                 if (setupSubstep==1)
-                   celsius = 1;
-                 else if (setupSubstep==2)
-                   celsius = 0;
-                   
-                 SaveTemperatureScale();
-                 ShowOK();
-              }
+           else if (setupStep==SETUP_STEP_12_24 && setupSubstep==1)
+           {
+            if (hour24==1)
+              hour24 = 0;
+            else
+              hour24 = 1;
+            Save12_24Hour();
+            ShowOK();
+           }
+           else if (setupStep==SETUP_STEP_WIFI && setupSubstep==1)
+           {
+              wifiManager.resetSettings();
+              ShowOK();
+              ESP.restart();
+           }
+           else if (setupStep==SETUP_STEP_C_F  && setupSubstep==1)
+           {
+             if (celsius==1)
+               celsius = 0;
+             else
+               celsius = 1;
+             SaveTemperatureScale();
+             ShowOK();
+           }
         else if (setupStep==SETUP_STEP_PIR)
               {
                  if (setupSubstep==1) //Alarm Off with PIR
@@ -1682,9 +1692,12 @@ void DisplayTask(void *pvParameters) {
         if (setupSubstep==0)
           CentreText(DISPLAY_MSG_12_24_HR);
         else if (setupSubstep==1)
-          CentreText(DISPLAY_MSG_12HR);
-        else if (setupSubstep==2)
-          CentreText(DISPLAY_MSG_24HR);
+        {
+          if (hour24==1)
+            CentreText(DISPLAY_MSG_12HR);
+          else
+            CentreText(DISPLAY_MSG_24HR);
+        }
       }
       else if (setupStep==SETUP_STEP_WIFI)
       {
@@ -1698,10 +1711,13 @@ void DisplayTask(void *pvParameters) {
        if (setupSubstep==0)
          CentreText(DISPLAY_MSG_C_F);
        else if (setupSubstep==1)
-         CentreText(DISPLAY_MSG_C);
-       else if (setupSubstep==2)
-         CentreText(DISPLAY_MSG_F);
+       {
+         if (celsius==1)
+           CentreText(DISPLAY_MSG_F);
+         else
+           CentreText(DISPLAY_MSG_C);
        }
+      }
       else if (setupStep==SETUP_STEP_PIR)
       {
         if (setupSubstep==0)
@@ -1756,8 +1772,7 @@ void DisplayTask(void *pvParameters) {
     } 
    
     getLight();
-    Serial.println(currentMode);
-
+ 
     vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
   } //For loop forever
@@ -1865,6 +1880,7 @@ void setup() {
   GetLEDMotionOn();
   GetDisplayMode();
   GetTemperatureScale();
+  Get12_24Hour();
 
   pinMode(BUZZER_PIN, OUTPUT);
  
