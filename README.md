@@ -44,7 +44,12 @@ To use Clocky, you will need the following:
 2. Install the required libraries using Arduino Library Manager.
 3. Connect your ESP32 board and sensors according to the wiring diagram provided in the project.
 4. Open the project in Arduino IDE.
-5. Upload the code to your ESP32 board.
+5. Include this in your additional boards manager urls - https://dl.espressif.com/dl/package_esp32_index.json
+6. Special note - esp32 by Espressif Systems - do not use the latest board - version stay with 2.0.17, otherwise the IR code library will break.
+7. Special note 2 - in MD_MAX72xx_font.cpp in ..libraries\MD_MAX72XX\src - you can get a better ":" for the clock by using this instead -   2, 54, 54,		// 58 - ':'
+8. i.e.  //2, 108, 108,		// 58 - ':' <--comment out this line
+  2, 54, 54,		// 58 - ':' // <--and replace it with this
+9. Upload the code to your ESP32 board.
 
 ## Usage
 
