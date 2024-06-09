@@ -14,7 +14,7 @@
 #include <Wire.h>
 
 #define DHTPIN 32     // Digital pin connected to the DHT sensor
-//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321c:\Users\peter\OneDrive\Documents\Arduino\libraries\MD_MAX72XX\src\MD_MAX72xx_font.cpp
 #define DHTTYPE DHT11   // DHT 11
 
 #define  DELAYTIME  100  // in milliseconds
@@ -126,6 +126,11 @@ const int DEMO_MODE = 7;
 const int SETUP_MODE = 8;
 
 const int SETUP_STEP_ALARM = 1;
+const int SETUP_STEP_ALARM_SUBSTEP_0_DISPLAY_ALARM = 0;
+const int SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME = 1;
+const int SETUP_STEP_ALARM_SUBSTEP_2_ON_OFF = 2;
+const int SETUP_STEP_ALARM_SUBSTEP_3_MOTION_OFF = 3;
+
 const int SETUP_STEP_12_24 = 2;
 const int SETUP_STEP_WIFI = 3;
 const int SETUP_STEP_C_F = 4;
@@ -140,6 +145,7 @@ const int SETUP_MAX = 7;
 volatile bool motionDetected = false;
 unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 6000; // Adjust debounce delay as needed
+bool keyHit = false;
 
 unsigned long lastMovementTime = 0;
 unsigned long lastLightCheckTime = 0;
@@ -301,10 +307,7 @@ void getLight()
   if ((millis() - lastLightCheckTime) < lightCheckPeriod) return;
   
   float lux = lightMeter.readLightLevel();
-  Serial.print("Light: ");
-  Serial.print(lux);
-  Serial.println(" lx");
-  
+ 
   if (lux < 20)
     mx.control(MD_MAX72XX::INTENSITY, 0);
   else
@@ -359,6 +362,8 @@ void ScrollText(const char *p)
   uint8_t cBuf[8];  // this should be ok for all built-in fonts
 
   if (priorityDisplaySet) return; //don't get in the way of priority display updates
+  
+  keyHit=false; //reset the IR Key hit
 
   mx.clear();
   
@@ -370,8 +375,11 @@ void ScrollText(const char *p)
     charWidth = mx.getChar(*p++, sizeof(cBuf) / sizeof(cBuf[0]), cBuf);
     for (uint8_t character_column=0; character_column<=charWidth; character_column++)	// allow space between characters
     {
-      if (oldMode != currentMode)
+      if (keyHit) //If a valid command was received then leave the scrolling
+      {
+        keyHit=false;
         return;
+      }
 
       //shift the whole lot left by 1
       mx.transform(MD_MAX72XX::TSL);
@@ -456,10 +464,6 @@ bool rain()
   return (oldMode == currentMode);
 }
 
-
-
-
-
 bool spectrum1()
 {
     const int minC = 0;
@@ -489,8 +493,9 @@ bool spectrum1()
         for (int col = 32; col >=0 ; col--) {
           for (int row = 7; row >= spectrum[col]; row--)
           {
-             mx.setPoint(row, col, true);
-              delay(1);
+            if (crossCheckBreak(oldMode)) return false;
+            mx.setPoint(row, col, true);
+            delay(1);
           }
         }
         mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
@@ -498,7 +503,6 @@ bool spectrum1()
         delay(DELAYTIME/20);
     }
      return (oldMode == currentMode);
-
 }
 
 bool spectrum2()
@@ -514,7 +518,9 @@ bool spectrum2()
 
   int oldMode = currentMode;
 
-    while (nCounter++ < 40  && oldMode == currentMode)
+   // mx.clear();
+
+    while (nCounter++ < 80  && oldMode == currentMode)
     {
         // Simulate audio input (you can replace this with actual audio data)
         // For demonstration purposes, let's assume we have an array of magnitude values
@@ -526,15 +532,10 @@ bool spectrum2()
         // Update the display based on the spectrum
         for (int i = 0; i < FFT_SIZE; ++i) {
             mx.setColumn(c, 0x00);
+            if (crossCheckBreak(oldMode)) return false;
             int barHeight = map(spectrum[i], 0, 255, minR, maxR);
-                 mx.setPoint(barHeight, c, true);
-                 delay(5);
-  /*              if (j < barHeight-1)
-                {
-                  delay(5);
-                  mx.setPoint(j, c, false);
-                }  */
-            // }
+            mx.setPoint(barHeight, c, true);
+            delay(5);
             c = (c + 1) % maxC; // Move to the next column
         }
 
@@ -649,6 +650,11 @@ bool bounce2()
   }
    return (oldMode == currentMode);
 
+}
+
+void dot(bool on)
+{
+  mx.setPoint(6, 1, true);
 }
 
 // Animation of a sine wave
@@ -779,7 +785,7 @@ bool bullseye()
   mx.clear();
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
 
-  for (uint8_t n=0; n<3; n++)
+  for (uint8_t n=0; n<2; n++)
   {
     byte  b = 0xff;
     int   i = 0;
@@ -787,7 +793,8 @@ bool bullseye()
     while (b != 0x00)
     {
       for (uint8_t j=0; j<MAX_DEVICES+1; j++)
-      {
+      {    
+        if (crossCheckBreak(oldMode)) return false;
         mx.setRow(j, i, b);
         mx.setColumn(j, i, b);
         mx.setRow(j, ROW_SIZE-1-i, b);
@@ -797,6 +804,7 @@ bool bullseye()
       delay(3*DELAYTIME);
       for (uint8_t j=0; j<MAX_DEVICES+1; j++)
       {
+         if (crossCheckBreak(oldMode)) return false;
         mx.setRow(j, i, 0);
         mx.setColumn(j, i, 0);
         mx.setRow(j, ROW_SIZE-1-i, 0);
@@ -812,6 +820,7 @@ bool bullseye()
     {
       for (uint8_t j=0; j<MAX_DEVICES+1; j++)
       {
+         if (crossCheckBreak(oldMode)) return false;
         mx.setRow(j, i, b);
         mx.setColumn(j, i, b);
         mx.setRow(j, ROW_SIZE-1-i, b);
@@ -821,7 +830,8 @@ bool bullseye()
       delay(3*DELAYTIME);
       for (uint8_t j=0; j<MAX_DEVICES+1; j++)
       {
-        mx.setRow(j, i, 0);
+         if (crossCheckBreak(oldMode)) return false;
+       mx.setRow(j, i, 0);
         mx.setColumn(j, i, 0);
         mx.setRow(j, ROW_SIZE-1-i, 0);
         mx.setColumn(j, COL_SIZE-1-i, 0);
@@ -875,6 +885,16 @@ bool randomDown()
 
 }
 
+bool crossCheckBreak(int old_mode)
+{
+  if (old_mode != currentMode)
+  {
+    mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+    return true;
+  }
+  return false;
+}
+
 bool cross()
 // Combination of setRow() and setColumn() with user controlled
 // display updates to ensure concurrent changes.
@@ -889,6 +909,7 @@ bool cross()
   {
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
+      if (crossCheckBreak(oldMode)) return false;
       mx.setColumn(j, i, 0xff);
       mx.setRow(j, i, 0xff);
     }
@@ -896,9 +917,12 @@ bool cross()
     delay(DELAYTIME);
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
+      if (crossCheckBreak(oldMode)) return false;
       mx.setColumn(j, i, 0x00);
       mx.setRow(j, i, 0x00);
     }
+
+     if (crossCheckBreak(oldMode)) return false;
   }
 
   // moving up the display on the R
@@ -906,16 +930,20 @@ bool cross()
   {
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
-      mx.setColumn(j, i, 0xff);
+      if (crossCheckBreak(oldMode)) return false;
+     mx.setColumn(j, i, 0xff);
       mx.setRow(j, ROW_SIZE-1, 0xff);
     }
     mx.update();
     delay(DELAYTIME);
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
+     if (crossCheckBreak(oldMode)) return false;
       mx.setColumn(j, i, 0x00);
       mx.setRow(j, ROW_SIZE-1, 0x00);
     }
+
+      if (crossCheckBreak(oldMode)) return false;
   }
 
   // diagonally up the display L to R
@@ -923,6 +951,7 @@ bool cross()
   {
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
+      if (crossCheckBreak(oldMode)) return false;
       mx.setColumn(j, i, 0xff);
       mx.setRow(j, ROW_SIZE-1-i, 0xff);
     }
@@ -930,12 +959,13 @@ bool cross()
     delay(DELAYTIME);
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
+     if (crossCheckBreak(oldMode)) return false;
       mx.setColumn(j, i, 0x00);
       mx.setRow(j, ROW_SIZE-1-i, 0x00);
     }
   }
+  
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
-
   return (oldMode == currentMode);
 
 }
@@ -948,12 +978,14 @@ void Demo()
 
     getTime();
     CentreText(displayTime);
-    ScreenDelay();
+    delay(500); // Delay between scrolls or updates
+
 
     if (!cross())
       return;
   
-    ScreenDelay();
+    delay(500); // delay between scrolls or updates
+
  
     getDay();
     CentreText(displayDay);
@@ -962,7 +994,7 @@ void Demo()
   
     getDate();
     CentreText(displayDate);
-    ScreenDelay();
+    delay(500);
 
     if (!bounce())
       return;
@@ -975,7 +1007,7 @@ void Demo()
 
     getTemperature();
     CentreText(displayTemperature);
-    ScreenDelay();
+    delay(500);
 
     if (!randomSpot())
       return;
@@ -986,7 +1018,7 @@ void Demo()
 
     getHumidity();
     CentreText(displayHumidity);
-    ScreenDelay();
+    delay(500);
 
     if (!randomDown())
       return;
@@ -1155,6 +1187,9 @@ void DisplayCurrentMode()
 
 void SetSaveandDisplayMode(int newMode, bool SaveMode = true)
 {
+  Serial.print("Mode changed to: ");
+  Serial.print(newMode);
+
    currentMode = newMode;
    if (SaveMode)
      SaveDisplayMode();
@@ -1217,10 +1252,6 @@ bool ValidateAlarmStringAddition(String newChar)
 
 void AddToAlarmString(String newChar)
 {
-  
-  if (setupStep!=SETUP_STEP_ALARM || setupSubstep!=1)
-    return; 
-  
   if(!ValidateAlarmStringAddition(newChar)) return; 
 
   if(alarmString.length()==2) //add the : as well..
@@ -1240,7 +1271,7 @@ void ShowOK()
 {
   SetPriorityDisplay(); 
   CentreText(DISPLAY_MSG_OK, true);
-  delay(1000); // Delay between scrolls or updates 
+  delay(500); // delay between scrolls or updates 
   ReleasePriorityDisplay(); 
 }
 
@@ -1280,6 +1311,8 @@ void checkIR() {
         //      Serial.print((uint32_t) (results.value >> 32), HEX);  // print the first part of the message
         Serial.println((uint32_t)(results.value & 0xFFFFFFFF), HEX); // print the second part of the message
         
+        keyHit =  (isValueInArray(results.value)); //Is it a recognised IR code (from the Clocky remote control)
+
         if(alarmBeeping)
         {
             if (isValueInArray(results.value)) //Is it a recognised IR code (from the Clocky remote control)
@@ -1322,7 +1355,7 @@ void checkIR() {
           {
            if (setupStep==SETUP_STEP_ALARM)
            {
-              if (setupSubstep==1)
+              if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME)
               {
                 if(alarmString.length() == 6)
                 {
@@ -1453,28 +1486,32 @@ void checkIR() {
            else
              Beep();    
          }
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_0])
-            AddToAlarmString("0");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_1])
-            AddToAlarmString("1");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_2])
-            AddToAlarmString("2");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_3])
-            AddToAlarmString("3");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_4])
-            AddToAlarmString("4");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_5])
-            AddToAlarmString("5");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_6])
-            AddToAlarmString("6");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_7])
-            AddToAlarmString("7");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_8])
-            AddToAlarmString("8");
-         else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_9])
-            AddToAlarmString("9");
-         else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_HASH])
-            DeleteFromAlarmString();
+
+         if (setupStep==SETUP_STEP_ALARM && setupSubstep!=SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME)
+         {
+            if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_0])
+                AddToAlarmString("0");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_1])
+                AddToAlarmString("1");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_2])
+                AddToAlarmString("2");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_3])
+                AddToAlarmString("3");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_4])
+                AddToAlarmString("4");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_5])
+                AddToAlarmString("5");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_6])
+                AddToAlarmString("6");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_7])
+                AddToAlarmString("7");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_8])
+                AddToAlarmString("8");
+            else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_9])
+                AddToAlarmString("9");
+            else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_HASH])
+                DeleteFromAlarmString();
+          }
         }
         else //We are not in settings mode
         {
@@ -1515,7 +1552,7 @@ void checkIR() {
                   else 
                     Beep();
                     
-                  delay(1000); // Delay between scrolls or updates
+                  delay(500); // delay between scrolls or updates
                   ReleasePriorityDisplay(); 
            }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_DOWN])
@@ -1552,15 +1589,6 @@ void checkIR() {
     }
 }
 
-void ScreenDelay()
-{
-  if (currentMode == SHOW_ALL)
-    delay(500); // Delay between scrolls or updates
-  else
-    delay(1000); // Delay between scrolls or updates
-}
-
-
 // Task function for Task1
 void DisplayTask(void *pvParameters) {
  
@@ -1582,7 +1610,7 @@ void DisplayTask(void *pvParameters) {
     if (Screensaver && currentMode != SETUP_MODE)
     {
       mx.clear();
-      delay(1000); // Delay between scrolls or updates
+      delay(500); // delay between scrolls or updates
       continue;
     } 
     
@@ -1591,43 +1619,49 @@ void DisplayTask(void *pvParameters) {
         if (currentMode == SHOW_TIME || currentMode == SHOW_ALL){
           getTime();
           CentreText(displayTime);
-          ScreenDelay();
+          if (currentMode == SHOW_TIME)
+             dot(true);
+             delay(500); // delay between scrolls or updates
         }
-
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){
           getDay(false);
           CentreText(displayDay);
-          ScreenDelay();
+          delay(500); // delay between scrolls or updates
         }
           
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){ //check the mode again, in case it has changed
           getDate();
           CentreText(displayDate);
-          ScreenDelay();
+          delay(500); // delay between scrolls or updates
         }
     }  
 
-    if (currentMode == SHOW_TEMPERATURE || currentMode == SHOW_ALL){
+    if (currentMode == SHOW_TEMPERATURE || currentMode == SHOW_ALL)
+    {
       getTemperature();
       CentreText(displayTemperature);
-      ScreenDelay();
+      delay(500); // delay between scrolls or updates
     }
 
-    if (currentMode == SHOW_HUMIDITY || currentMode == SHOW_ALL){
+    if (currentMode == SHOW_HUMIDITY || currentMode == SHOW_ALL)
+    {
        getHumidity();
        CentreText(displayHumidity);
-       ScreenDelay();
+       delay(500); // delay between scrolls or updates
     }
     else if (currentMode == DEMO_MODE)
+    {
        Demo();
-    else if (currentMode == SETUP_MODE){
+    }
+    else if (currentMode == SETUP_MODE)
+    {
       if (setupStep==SETUP_STEP_ALARM)
       {
-        if (setupSubstep==0)
+        if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_0_DISPLAY_ALARM)
           CentreText(DISPLAY_MSG_ALARM);
-        else if (setupSubstep==1)
+        else if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME)
           CentreText(alarmString.c_str());
-        else if (setupSubstep==2)
+        else if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_2_ON_OFF)
         {
           if(alarmOn)
             CentreText(DISPLAY_MSG_ALARM_OFF);      
@@ -1635,7 +1669,7 @@ void DisplayTask(void *pvParameters) {
             CentreText(DISPLAY_MSG_ALARM_ON);      
 
         } 
-        else if (setupSubstep==3)
+        else if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_3_MOTION_OFF)
         {
           if(alarmMotionOn)
             ScrollText(DISPLAY_MSG_ALARM_MOTION_OFF);      
@@ -1718,13 +1752,15 @@ void DisplayTask(void *pvParameters) {
         sprintf(scrollBuffer, "%s %s %s %s %s", displayTime, displayDay, displayDate, displayTemperature, displayHumidity); 
         mx.clear();
         ScrollText(scrollBuffer);
-        delay(100); // Delay between scrolls or updates
+        delay(100); // delay between scrolls or updates
     } 
    
     getLight();
+    Serial.println(currentMode);
 
-    vTaskDelay(pdMS_TO_TICKS(100)); // Delay for a bit
-  }
+    vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
+
+  } //For loop forever
 }
 
 // Task function for Task2 - Trigger task - triggered by IR remote, PIR
@@ -1732,7 +1768,7 @@ void TriggerTask(void *pvParameters) {
   irrecv.enableIRIn();
   for (;;) {
     checkIR();
-    vTaskDelay(pdMS_TO_TICKS(100)); // Delay for a bit
+    vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
     if (alarmOn==1 && strcmp(displayTime, alarmString.c_str()) == 0) 
       alarmBeeping=true; //switch on the alarm beeping
@@ -1756,13 +1792,11 @@ void TriggerTask(void *pvParameters) {
         alarmBeeping=false;
       }
     }
-    
-    //Check light level and adjust displayt if required
+    //Check light level and adjust display if required
     getLight();
 
     // Check if screensaver should be activated
     Screensaver = (LEDMotionOn==1 && ((millis() - lastMovementTime) > screensaverTimeout));
-
   }
 }
 
