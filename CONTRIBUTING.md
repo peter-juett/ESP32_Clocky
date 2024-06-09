@@ -1,6 +1,6 @@
-# Contributing to [Project Name]
+# Contributing to Clocky!
 
-Thank you for considering contributing to ESP32_CLocky! By contributing to this project, you help make it better for everyone. Please take a moment to review the following guidelines.
+Thank you for considering contributing to ESP32_Clocky! By contributing to this project, you help make it better for everyone. Please take a moment to review the following guidelines.
 
 ## How to Contribute
 
