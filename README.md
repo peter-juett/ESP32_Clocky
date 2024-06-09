@@ -24,6 +24,8 @@ Clocky is a customizable digital clock project designed for ESP32 microcontrolle
 - Light sensor for dimming the display automatically when dark. 
 - Multiple display modes including scrolling text and animations.
 - Infrared remote control for convenient operation.
+- Dismiss the alarm with a wave.
+- Choose to only show the time etc. momentarily with a wave.
 - Integration with external sensors and modules.
 
 ## Requirements
