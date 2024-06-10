@@ -14,10 +14,11 @@
 #include <Wire.h>
 
 #define DHTPIN 32     // Digital pin connected to the DHT sensor
-//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321c:\Users\peter\OneDrive\Documents\Arduino\libraries\MD_MAX72XX\src\MD_MAX72xx_font.cpp
+//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 #define DHTTYPE DHT11   // DHT 11
 
-#define  DELAYTIME  100  // in milliseconds
+#define  DELAY_TIME  100  // in milliseconds
+#define  SCREEN_DELAY_TIME  500  // in milliseconds
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES	4
 #define CS_PIN    5  
@@ -169,39 +170,32 @@ const int temperature_sensor = SHT31;
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 
 Adafruit_SHT31 sht31; 
-DHT dht(DHTPIN, DHTTYPE);
-BH1750 lightMeter;
 
+DHT dht(DHTPIN, DHTTYPE);
+
+BH1750 lightMeter;
 
 Preferences preferences;
 
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
-//const long  gmtOffset_sec = 8 * 3600;
-//const int   daylightOffset_sec = 3600;
-//const char* time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";  // TimeZone rule for Europe/Rome including daylight adjustment rules (optional)
+
 char displayTime[10]=""; 
-char displayDate[10]="";
-char displayDay[10]="";
-char displayTemperature[10]=""; 
-char displayHumidity[10]="";
 String alarmString="";
 String timeZone; 
+int currentMode;
+int hour24;
+int intensity;
+
 
 //String setupString = "";
 
 struct tm timeinfo;
 
-
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
 WiFiManager wifiManager; // Initialize WiFiManager
-
-int currentMode;
-
-int hour24;
-int intensity;
 
 TaskHandle_t DisplayTask_Handle, TriggerTask_Handle;
 
@@ -243,29 +237,45 @@ String getDatePostfix(const struct tm* timeinfo) {
         }
     }
 }
-void getDay(bool fullDay = false)
+String getDay(bool fullDay = false)
 {
+    char dayBuffer[20]; // Sufficient size for full day name or abbreviated day name
+    
     if (fullDay)       
-        strftime(displayDay, sizeof(displayDay), "%A", &timeinfo); // Format day of month
+        strftime(dayBuffer, sizeof(dayBuffer), "%A", &timeinfo); // Full day name
     else
-        strftime(displayDay, sizeof(displayDay), "%a", &timeinfo); // Format day of month
+        strftime(dayBuffer, sizeof(dayBuffer), "%a", &timeinfo); // Abbreviated day name
+    
+    return String(dayBuffer);
  
 }
-void getDate(bool addPostfix = false)
+String getDate(bool addPostfix = false)
 {
     char monthPart[4];
-        
-    strftime(displayDate, sizeof(displayDate), "%e", &timeinfo); // Format day of month
-    strftime(monthPart, sizeof(monthPart), "%b", &timeinfo); // Format day of month
+    String displayDate;
 
+    // Format day of month
+    char dayPart[3];
+    strftime(dayPart, sizeof(dayPart), "%e", &timeinfo);
+    displayDate = String(dayPart);
+
+    // Format month part
+    strftime(monthPart, sizeof(monthPart), "%b", &timeinfo);
+
+    // Append postfix if needed
     if (addPostfix) {
         String postfix = getDatePostfix(&timeinfo);
-        strcat(displayDate, postfix.c_str()); // Append postfix
+        displayDate += postfix;
     }
 
-    strcat(displayDate, " ");
-    strcat(displayDate, monthPart);
+    // Append space and month part
+    displayDate += " ";
+    displayDate += String(monthPart);
+
+    // Return displayDate
+    return displayDate;
 }
+
 
 float ConvertTemperatureToF(float temperature)
 {
@@ -275,8 +285,10 @@ float ConvertTemperatureToF(float temperature)
   return (temperature*1.8)+32;
 }
 
-void getTemperature()
+String getTemperature()
 {
+  char displayTemperature[10]; 
+
   if (temperature_sensor == SHT31)
   {
     if (celsius==1)
@@ -291,15 +303,19 @@ void getTemperature()
    else 
      sprintf(displayTemperature, "%.1f%cF", ConvertTemperatureToF(dht.readTemperature()), DEGREE_CHARACTER);
   }
+  return String(displayTemperature);
 }
 
-void getHumidity()
+String getHumidity()
 {
-  if (temperature_sensor == SHT31)
-    sprintf(displayHumidity, "%.1f%%", sht31.readHumidity());
-  else
-    sprintf(displayHumidity, "%.1f%%", dht.readHumidity());
+   float humidityValue;
+    
+    if (temperature_sensor == SHT31)
+        humidityValue = sht31.readHumidity();
+    else
+        humidityValue = dht.readHumidity();
 
+    return String(humidityValue, 1) + "%";
 }
 
 void getLight()
@@ -353,7 +369,47 @@ void CentreText(const char *p, bool PriorityDisplay = false)
     mx.transform(MD_MAX72XX::TSR);
 
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
-  delay(DELAYTIME * 5);
+  delay(DELAY_TIME * 5);
+}
+
+void CentreText(const String &p, bool PriorityDisplay = false)
+{
+    uint8_t charWidth;
+    uint8_t totalCharWidth = 0;
+    uint8_t cBuf[8];  // This should be ok for all built-in fonts
+    int offset = 0;
+
+    if (priorityDisplaySet && !PriorityDisplay)
+        return;
+
+    mx.clear();
+
+    for (unsigned int i = 0; i < p.length(); i++)
+    {
+        // Put the character into cBuf and find the width
+        charWidth = mx.getChar(p[i], sizeof(cBuf) / sizeof(cBuf[0]), cBuf);
+        totalCharWidth += charWidth;
+        totalCharWidth += 1;
+        mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+
+        for (uint8_t character_column = 0; character_column <= charWidth; character_column++)
+        {
+            if (character_column < charWidth)
+                mx.setColumn(31 - offset, cBuf[character_column]);
+            else
+                mx.setColumn(31 - offset, 0);
+
+            offset++;
+        }
+    }
+
+    totalCharWidth -= 1;
+
+    for (int x = 0; x < (32 - totalCharWidth) / 2; x++)
+        mx.transform(MD_MAX72XX::TSR);
+
+    mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+    delay(DELAY_TIME * 5);
 }
 
 void ScrollText(const char *p)
@@ -389,7 +445,7 @@ void ScrollText(const char *p)
       else 
          mx.setColumn(0, 0);
   
-      delay(DELAYTIME);
+      delay(DELAY_TIME);
     }
   }
 }
@@ -414,7 +470,7 @@ bool randomSpot()
     r = random(minR, maxR);
     c = random(minC, maxC);
     mx.setPoint(r, c, true);
-    delay(DELAYTIME/10);
+    delay(DELAY_TIME/10);
   }
    return (oldMode == currentMode);
 }
@@ -500,7 +556,7 @@ bool spectrum1()
         }
         mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
 
-        delay(DELAYTIME/20);
+        delay(DELAY_TIME/20);
     }
      return (oldMode == currentMode);
 }
@@ -539,7 +595,7 @@ bool spectrum2()
             c = (c + 1) % maxC; // Move to the next column
         }
 
-     //   delay(DELAYTIME / 10);
+     //   delay(DELAY_TIME / 10);
     }
      return (oldMode == currentMode);
 
@@ -559,7 +615,7 @@ bool rows()
    if (oldMode != currentMode)
      break;
     mx.setRow(row, 0xff);
-    delay(2*DELAYTIME);
+    delay(2*DELAY_TIME);
     mx.setRow(row, 0x00);
   }
  return (oldMode == currentMode);
@@ -590,7 +646,7 @@ bool bounce()
     r += dR;
     c += dC;
     mx.setPoint(r, c, true);
-    delay(DELAYTIME/2);
+    delay(DELAY_TIME/2);
 
     if ((r == minR) || (r == maxR))
       dR = -dR;
@@ -639,7 +695,7 @@ bool bounce2()
     r += dR;
     c += dC;
     mx.setPoint(r, c, true);
-    delay(DELAYTIME/2);
+    delay(DELAY_TIME/2);
 
     if ((r == minR) || (r == maxR))
       dR = -dR;
@@ -682,7 +738,7 @@ bool sineWave()
     }
 
     angle += angularVelocity;
-    delay(DELAYTIME); // Adjust delay for animation speed
+    delay(DELAY_TIME); // Adjust delay for animation speed
   }
 
   return (oldMode == currentMode);
@@ -697,7 +753,7 @@ void columns2(bool bClear)
   for (uint8_t col=mx.getColumnCount(); col>0; col--)
   {
     mx.setColumn(col, 0xff);
-    delay(DELAYTIME/MAX_DEVICES);
+    delay(DELAY_TIME/MAX_DEVICES);
     mx.setColumn(col, 0x00);
   }
 }
@@ -728,7 +784,7 @@ void RightUp(const char *p)
   
       offset++;
 
-        delay(DELAYTIME);
+        delay(DELAY_TIME);
     }
   }
   
@@ -745,7 +801,7 @@ void RightUp(const char *p)
         return;
 
       mx.transform(MD_MAX72XX::TSU);
-      delay(DELAYTIME);
+      delay(DELAY_TIME);
     }
 }
 
@@ -770,7 +826,7 @@ bool randomFill(bool clear, bool fill)
     r = random(minR, maxR);
     c = random(minC, maxC);
     mx.setPoint(r, c, fill);
-    delay(DELAYTIME/50);
+    delay(DELAY_TIME/50);
   }
 
   return (oldMode == currentMode);
@@ -801,7 +857,7 @@ bool bullseye()
         mx.setColumn(j, COL_SIZE-1-i, b);
       }
       mx.update();
-      delay(3*DELAYTIME);
+      delay(3*DELAY_TIME);
       for (uint8_t j=0; j<MAX_DEVICES+1; j++)
       {
          if (crossCheckBreak(oldMode)) return false;
@@ -827,7 +883,7 @@ bool bullseye()
         mx.setColumn(j, COL_SIZE-1-i, b);
       }
       mx.update();
-      delay(3*DELAYTIME);
+      delay(3*DELAY_TIME);
       for (uint8_t j=0; j<MAX_DEVICES+1; j++)
       {
          if (crossCheckBreak(oldMode)) return false;
@@ -877,9 +933,9 @@ bool randomDown()
        colRowValue[c]++;
 
     mx.setPoint(colRowValue[c], c, true);
-    delay(DELAYTIME/50);
+    delay(DELAY_TIME/50);
   }
-   delay(DELAYTIME *6);
+   delay(DELAY_TIME *6);
 
     return (oldMode == currentMode);
 
@@ -914,7 +970,7 @@ bool cross()
       mx.setRow(j, i, 0xff);
     }
     mx.update();
-    delay(DELAYTIME);
+    delay(DELAY_TIME);
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
       if (crossCheckBreak(oldMode)) return false;
@@ -935,7 +991,7 @@ bool cross()
       mx.setRow(j, ROW_SIZE-1, 0xff);
     }
     mx.update();
-    delay(DELAYTIME);
+    delay(DELAY_TIME);
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
      if (crossCheckBreak(oldMode)) return false;
@@ -956,7 +1012,7 @@ bool cross()
       mx.setRow(j, ROW_SIZE-1-i, 0xff);
     }
     mx.update();
-    delay(DELAYTIME);
+    delay(DELAY_TIME);
     for (uint8_t j=0; j<MAX_DEVICES; j++)
     {
      if (crossCheckBreak(oldMode)) return false;
@@ -978,23 +1034,20 @@ void Demo()
 
     getTime();
     CentreText(displayTime);
-    delay(500); // Delay between scrolls or updates
+    delay(DELAY_TIME); // Delay between scrolls or updates
 
 
     if (!cross())
       return;
   
-    delay(500); // delay between scrolls or updates
+    delay(DELAY_TIME); // delay between scrolls or updates
 
- 
-    getDay();
-    CentreText(displayDay);
+    CentreText(getDay());
     if (!bullseye())
       return;
   
-    getDate();
-    CentreText(displayDate);
-    delay(500);
+    CentreText(getDate());
+    delay(DELAY_TIME);
 
     if (!bounce())
       return;
@@ -1005,9 +1058,8 @@ void Demo()
     if (!spectrum2())
       return;
 
-    getTemperature();
-    CentreText(displayTemperature);
-    delay(500);
+    CentreText(getTemperature());
+    delay(DELAY_TIME);
 
     if (!randomSpot())
       return;
@@ -1016,9 +1068,8 @@ void Demo()
     if (!randomFill(false, false))
       return;
 
-    getHumidity();
-    CentreText(displayHumidity);
-    delay(500);
+    CentreText(getHumidity());
+    delay(DELAY_TIME);
 
     if (!randomDown())
       return;
@@ -1028,11 +1079,11 @@ void Demo()
       return;
 }
 
-void SaveDisplayMode()
+void SaveInt(const char * key, int value)
 { 
     preferences.begin("Settings", false);
-    preferences.putInt("display_mode", currentMode); 
-    Serial.println("display mode has been Saved");
+    preferences.putInt(key, value); 
+    Serial.println(String(key) + " has been Saved");
     preferences.end();
 }
 
@@ -1049,69 +1100,6 @@ void SaveTimeZone()
     preferences.begin("Settings", false);
     preferences.putString("timezone", timeZone); 
     Serial.println("timeZone has been Saved");
-    preferences.end();
-}
-
-void SaveCurrentRemote()
-{ 
-    preferences.begin("Settings", false);
-    preferences.putInt("remote_control", current_remote); 
-    Serial.println("Current remote has been Saved");
-    Serial.println(current_remote);
-    preferences.end();
-}
-
-void SaveTemperatureScale()
-{ 
-    preferences.begin("Settings", false);
-    preferences.putInt("celsius", celsius); 
-    Serial.println("Temperature scale has been Saved");
-    Serial.println(celsius);
-    preferences.end();
-}
-
-void SaveIntensity()
-{ 
-    preferences.begin("Settings", false);
-    preferences.putInt("intensity", intensity); 
-    Serial.println("Intensity has been Saved");
-    Serial.println(intensity);
-    preferences.end();
-}
-
-void SaveAlarmOn()
-{  
-    preferences.begin("Settings", false);
-    preferences.putInt("alarm_on", alarmOn); 
-    Serial.println("alarmOn has been Saved");
-    Serial.println(alarmOn);
-    preferences.end();
-}
-
-void SaveAlarmMotionOn()
-{  
-    preferences.begin("Settings", false);
-    preferences.putInt("alarm_motion_on", alarmMotionOn); 
-    Serial.println("alarmMotionOn has been Saved");
-    Serial.println(alarmMotionOn);
-    preferences.end();
-}
-
-void SaveLEDMotionOn()
-{  
-    preferences.begin("Settings", false);
-    preferences.putInt("motion_screen_on", LEDMotionOn); 
-    Serial.println("LEDMotionOn has been Saved");
-    Serial.println(LEDMotionOn);
-    preferences.end();
-}
-
-void Save12_24Hour()
-{  
-    preferences.begin("Settings", false);
-    preferences.putInt("hour24", hour24); 
-    Serial.println("hour24 has been Saved");
-    Serial.println(hour24);
     preferences.end();
 }
 
@@ -1148,8 +1136,6 @@ void Get12_24Hour()
     preferences.end();
 }
 
-
-
 void GetTemperatureScale()
 { 
     preferences.begin("Settings", false);
@@ -1160,15 +1146,13 @@ void GetTemperatureScale()
     preferences.end();
 }
 
-
 void CentreTextPriority(const char * msg)
 {
   SetPriorityDisplay();
   CentreText(msg, true);
-  delay(500);
+  delay(DELAY_TIME);
   ReleasePriorityDisplay();
 }
-
 
 void DisplayCurrentMode()
 {
@@ -1210,7 +1194,7 @@ void SetSaveandDisplayMode(int newMode, bool SaveMode = true)
 
    currentMode = newMode;
    if (SaveMode)
-     SaveDisplayMode();
+     SaveInt("display_mode", currentMode);
    
    DisplayCurrentMode();
 }
@@ -1290,7 +1274,7 @@ void ShowOK()
 {
   SetPriorityDisplay(); 
   CentreText(DISPLAY_MSG_OK, true);
-  delay(500); // delay between scrolls or updates 
+  delay(DELAY_TIME); // delay between scrolls or updates 
   ReleasePriorityDisplay(); 
 }
 
@@ -1335,7 +1319,7 @@ void checkIR() {
               Serial.print("Switching off alarm");  
               alarmBeeping=false;
               alarmOn=0;
-              SaveAlarmOn();
+              SaveInt("alarm_on", alarmOn);
               irrecv.resume(); // Receive the next value
               return; // - no need to process this IR key press
             }
@@ -1377,7 +1361,7 @@ void checkIR() {
                   alarmString.remove(alarmString.length() - 1); // Removes the last character '?' from the string
                   SaveAlarmString();
                   alarmOn=1;  //Turn on the alarm
-                  SaveAlarmOn();
+                  SaveInt("alarm_on", alarmOn);
                   ShowOK();
                 } 
                 else
@@ -1390,7 +1374,7 @@ void checkIR() {
                 else
                   alarmOn=1;
                
-                SaveAlarmOn();
+                SaveInt("alarm_on", alarmOn);
                 ShowOK();
               }
             else if (setupSubstep==3)
@@ -1400,7 +1384,7 @@ void checkIR() {
                 else
                   alarmMotionOn=1;
                
-                SaveAlarmMotionOn();
+                SaveInt("alarm_motion_on", alarmMotionOn);
                 ShowOK();
               }
            }
@@ -1410,7 +1394,7 @@ void checkIR() {
               hour24 = 0;
             else
               hour24 = 1;
-            Save12_24Hour();
+            SaveInt("hour24", hour24);
             ShowOK();
            }
            else if (setupStep==SETUP_STEP_WIFI && setupSubstep==1)
@@ -1425,11 +1409,11 @@ void checkIR() {
                celsius = 0;
              else
                celsius = 1;
-             SaveTemperatureScale();
+             SaveInt("celsius", celsius);
              ShowOK();
            }
-        else if (setupStep==SETUP_STEP_PIR)
-              {
+           else if (setupStep==SETUP_STEP_PIR)
+           {
                  if (setupSubstep==1) //Alarm Off with PIR
                  {
                    if (alarmMotionOn==1)
@@ -1437,7 +1421,7 @@ void checkIR() {
                    else
                      alarmMotionOn=1;
                
-                   SaveAlarmMotionOn();
+                   SaveInt("alarm_motion_on", alarmMotionOn);
                    ShowOK();
                  }
                  else if (setupSubstep==2) //Screen On with PIR
@@ -1447,13 +1431,10 @@ void checkIR() {
                    else
                      LEDMotionOn=1;
                
-                   SaveLEDMotionOn();
+                   SaveInt("motion_screen_on", LEDMotionOn);
                    ShowOK();
                  }
-                   
-                 SaveTemperatureScale();
-                 ShowOK();
-              }
+           }
            else if (setupStep==SETUP_STEP_ZONE)
               {
                  if (setupSubstep==1) //Tokyo
@@ -1471,8 +1452,6 @@ void checkIR() {
                    SetTimezone("HKT-8"); 
                    SaveTimeZone(); 
                  }
-                   
-         //        SaveTemperatureScale();
                  ShowOK();
               }
          else if (setupStep==SETUP_STEP_EXIT)
@@ -1557,12 +1536,12 @@ void checkIR() {
                   if (intensity < 10) {
                       intensity++;
                       mx.control(MD_MAX72XX::INTENSITY, intensity);
-                      SaveIntensity();
+                      SaveInt("intensity", intensity);
                   } 
                   else 
                     Beep();
                     
-                  delay(500); // delay between scrolls or updates
+                  delay(DELAY_TIME); // delay between scrolls or updates
                   ReleasePriorityDisplay(); 
            }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_DOWN])
@@ -1570,7 +1549,7 @@ void checkIR() {
                   if (intensity > 0) {
                       intensity--;
                       mx.control(MD_MAX72XX::INTENSITY, intensity);
-                      SaveIntensity();
+                      SaveInt("intensity", intensity);
                   } 
                   else 
                     Beep();
@@ -1603,7 +1582,7 @@ void checkIR() {
 void DisplayTask(void *pvParameters) {
  
   ScrollText("Welcome to Clocky!");
-  delay(500);
+  delay(DELAY_TIME);
   columns2(false);
   
   for (;;) {
@@ -1620,7 +1599,7 @@ void DisplayTask(void *pvParameters) {
     if (Screensaver && currentMode != SETUP_MODE)
     {
       mx.clear();
-      delay(500); // delay between scrolls or updates
+      delay(DELAY_TIME); // delay between scrolls or updates
       continue;
     } 
     
@@ -1631,33 +1610,29 @@ void DisplayTask(void *pvParameters) {
           CentreText(displayTime);
           if (currentMode == SHOW_TIME)
              dot(true);
-             delay(500); // delay between scrolls or updates
+             delay(DELAY_TIME); // delay between scrolls or updates
         }
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){
-          getDay(false);
-          CentreText(displayDay);
-          delay(500); // delay between scrolls or updates
+          CentreText(getDay(false));
+          delay(DELAY_TIME); // delay between scrolls or updates
         }
           
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){ //check the mode again, in case it has changed
-          getDate();
-          CentreText(displayDate);
-          delay(500); // delay between scrolls or updates
+          CentreText(getDate());
+          delay(DELAY_TIME); // delay between scrolls or updates
         }
     }  
 
     if (currentMode == SHOW_TEMPERATURE || currentMode == SHOW_ALL)
     {
-      getTemperature();
-      CentreText(displayTemperature);
-      delay(500); // delay between scrolls or updates
+      CentreText(getTemperature());
+      delay(DELAY_TIME); // delay between scrolls or updates
     }
 
     if (currentMode == SHOW_HUMIDITY || currentMode == SHOW_ALL)
     {
-       getHumidity();
-       CentreText(displayHumidity);
-       delay(500); // delay between scrolls or updates
+       CentreText(getHumidity());
+       delay(DELAY_TIME); // delay between scrolls or updates
     }
     else if (currentMode == DEMO_MODE)
     {
@@ -1670,7 +1645,7 @@ void DisplayTask(void *pvParameters) {
         if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_0_DISPLAY_ALARM)
           CentreText(DISPLAY_MSG_ALARM);
         else if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_1_EDIT_TIME)
-          CentreText(alarmString.c_str());
+          CentreText(alarmString);
         else if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_2_ON_OFF)
         {
           if(alarmOn)
@@ -1760,12 +1735,8 @@ void DisplayTask(void *pvParameters) {
           return;
         }
         getTime();
-        getDate(true);
-        getDay(true);
-        getTemperature();
-        getHumidity();
  
-        sprintf(scrollBuffer, "%s %s %s %s %s", displayTime, displayDay, displayDate, displayTemperature, displayHumidity); 
+        sprintf(scrollBuffer, "%s %s %s %s %s", displayTime, getDay(), getDate(true).c_str(), getTemperature().c_str(), getHumidity().c_str()); 
         mx.clear();
         ScrollText(scrollBuffer);
         delay(100); // delay between scrolls or updates
@@ -1803,7 +1774,7 @@ void TriggerTask(void *pvParameters) {
       if (alarmMotionOn==1 && alarmBeeping)
       {
         alarmOn=0;
-        SaveAlarmOn();
+        SaveInt("alarm_on", alarmOn);
         alarmBeeping=false;
       }
     }
