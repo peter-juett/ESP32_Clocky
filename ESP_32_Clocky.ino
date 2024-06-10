@@ -1034,20 +1034,20 @@ void Demo()
 
     getTime();
     CentreText(displayTime);
-    delay(DELAY_TIME); // Delay between scrolls or updates
+    delay(SCREEN_DELAY_TIME); // Delay between scrolls or updates
 
 
     if (!cross())
       return;
   
-    delay(DELAY_TIME); // delay between scrolls or updates
+    delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
 
     CentreText(getDay());
     if (!bullseye())
       return;
   
     CentreText(getDate());
-    delay(DELAY_TIME);
+    delay(SCREEN_DELAY_TIME);
 
     if (!bounce())
       return;
@@ -1059,7 +1059,7 @@ void Demo()
       return;
 
     CentreText(getTemperature());
-    delay(DELAY_TIME);
+    delay(SCREEN_DELAY_TIME);
 
     if (!randomSpot())
       return;
@@ -1069,7 +1069,7 @@ void Demo()
       return;
 
     CentreText(getHumidity());
-    delay(DELAY_TIME);
+    delay(SCREEN_DELAY_TIME);
 
     if (!randomDown())
       return;
@@ -1079,7 +1079,7 @@ void Demo()
       return;
 }
 
-void SaveInt(const char * key, int value)
+void SaveSetting(const char * key, int value)
 { 
     preferences.begin("Settings", false);
     preferences.putInt(key, value); 
@@ -1087,19 +1087,11 @@ void SaveInt(const char * key, int value)
     preferences.end();
 }
 
-void SaveAlarmString()
+void SaveSetting(const char * key, String value)
 { 
     preferences.begin("Settings", false);
-    preferences.putString("alarm", alarmString); 
-    Serial.println("Alarm been Saved");
-    preferences.end();
-}
-
-void SaveTimeZone()
-{ 
-    preferences.begin("Settings", false);
-    preferences.putString("timezone", timeZone); 
-    Serial.println("timeZone has been Saved");
+    preferences.putString(key, value); 
+    Serial.println(String(key) + " has been Saved");
     preferences.end();
 }
 
@@ -1107,7 +1099,6 @@ void GetIntensity()
 { 
     preferences.begin("Settings", false);
     intensity = preferences.getInt("intensity", 0);
-    mx.control(MD_MAX72XX::INTENSITY, intensity);
     preferences.end(); // Close the Preferences object  
 }
 
@@ -1150,7 +1141,7 @@ void CentreTextPriority(const char * msg)
 {
   SetPriorityDisplay();
   CentreText(msg, true);
-  delay(DELAY_TIME);
+  delay(SCREEN_DELAY_TIME);
   ReleasePriorityDisplay();
 }
 
@@ -1194,7 +1185,7 @@ void SetSaveandDisplayMode(int newMode, bool SaveMode = true)
 
    currentMode = newMode;
    if (SaveMode)
-     SaveInt("display_mode", currentMode);
+     SaveSetting("display_mode", currentMode);
    
    DisplayCurrentMode();
 }
@@ -1274,7 +1265,7 @@ void ShowOK()
 {
   SetPriorityDisplay(); 
   CentreText(DISPLAY_MSG_OK, true);
-  delay(DELAY_TIME); // delay between scrolls or updates 
+  delay(SCREEN_DELAY_TIME); // delay between scrolls or updates 
   ReleasePriorityDisplay(); 
 }
 
@@ -1319,7 +1310,7 @@ void checkIR() {
               Serial.print("Switching off alarm");  
               alarmBeeping=false;
               alarmOn=0;
-              SaveInt("alarm_on", alarmOn);
+              SaveSetting("alarm_on", alarmOn);
               irrecv.resume(); // Receive the next value
               return; // - no need to process this IR key press
             }
@@ -1359,9 +1350,9 @@ void checkIR() {
                 if(alarmString.length() == 6)
                 {
                   alarmString.remove(alarmString.length() - 1); // Removes the last character '?' from the string
-                  SaveAlarmString();
+                  SaveSetting("alarm", alarmString);
                   alarmOn=1;  //Turn on the alarm
-                  SaveInt("alarm_on", alarmOn);
+                  SaveSetting("alarm_on", alarmOn);
                   ShowOK();
                 } 
                 else
@@ -1374,7 +1365,7 @@ void checkIR() {
                 else
                   alarmOn=1;
                
-                SaveInt("alarm_on", alarmOn);
+                SaveSetting("alarm_on", alarmOn);
                 ShowOK();
               }
             else if (setupSubstep==3)
@@ -1384,7 +1375,7 @@ void checkIR() {
                 else
                   alarmMotionOn=1;
                
-                SaveInt("alarm_motion_on", alarmMotionOn);
+                SaveSetting("alarm_motion_on", alarmMotionOn);
                 ShowOK();
               }
            }
@@ -1394,7 +1385,7 @@ void checkIR() {
               hour24 = 0;
             else
               hour24 = 1;
-            SaveInt("hour24", hour24);
+            SaveSetting("hour24", hour24);
             ShowOK();
            }
            else if (setupStep==SETUP_STEP_WIFI && setupSubstep==1)
@@ -1409,7 +1400,7 @@ void checkIR() {
                celsius = 0;
              else
                celsius = 1;
-             SaveInt("celsius", celsius);
+             SaveSetting("celsius", celsius);
              ShowOK();
            }
            else if (setupStep==SETUP_STEP_PIR)
@@ -1421,7 +1412,7 @@ void checkIR() {
                    else
                      alarmMotionOn=1;
                
-                   SaveInt("alarm_motion_on", alarmMotionOn);
+                   SaveSetting("alarm_motion_on", alarmMotionOn);
                    ShowOK();
                  }
                  else if (setupSubstep==2) //Screen On with PIR
@@ -1431,7 +1422,7 @@ void checkIR() {
                    else
                      LEDMotionOn=1;
                
-                   SaveInt("motion_screen_on", LEDMotionOn);
+                   SaveSetting("motion_screen_on", LEDMotionOn);
                    ShowOK();
                  }
            }
@@ -1440,17 +1431,17 @@ void checkIR() {
                  if (setupSubstep==1) //Tokyo
                  {
                    SetTimezone("JST-9"); 
-                   SaveTimeZone(); 
+                   SaveSetting("timezone", timeZone); 
                  }
                  else if (setupSubstep==2) //UK
                  {
                    SetTimezone("GMT0BST,M3.5.0/1,M10.5.0"); 
-                   SaveTimeZone(); 
+                   SaveSetting("timezone", timeZone); 
                  }
                  else if (setupSubstep==3) //HK
                  {
                    SetTimezone("HKT-8"); 
-                   SaveTimeZone(); 
+                   SaveSetting("timezone", timeZone); 
                  }
                  ShowOK();
               }
@@ -1536,12 +1527,12 @@ void checkIR() {
                   if (intensity < 10) {
                       intensity++;
                       mx.control(MD_MAX72XX::INTENSITY, intensity);
-                      SaveInt("intensity", intensity);
+                      SaveSetting("intensity", intensity);
                   } 
                   else 
                     Beep();
                     
-                  delay(DELAY_TIME); // delay between scrolls or updates
+                  delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
                   ReleasePriorityDisplay(); 
            }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_DOWN])
@@ -1549,7 +1540,7 @@ void checkIR() {
                   if (intensity > 0) {
                       intensity--;
                       mx.control(MD_MAX72XX::INTENSITY, intensity);
-                      SaveInt("intensity", intensity);
+                      SaveSetting("intensity", intensity);
                   } 
                   else 
                     Beep();
@@ -1582,7 +1573,7 @@ void checkIR() {
 void DisplayTask(void *pvParameters) {
  
   ScrollText("Welcome to Clocky!");
-  delay(DELAY_TIME);
+  delay(SCREEN_DELAY_TIME);
   columns2(false);
   
   for (;;) {
@@ -1599,40 +1590,41 @@ void DisplayTask(void *pvParameters) {
     if (Screensaver && currentMode != SETUP_MODE)
     {
       mx.clear();
-      delay(DELAY_TIME); // delay between scrolls or updates
+      delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
       continue;
     } 
     
     if (currentMode == SHOW_TIME || currentMode == SHOW_DATE || currentMode == SHOW_ALL || currentMode == SCROLL_ALL)
     {
-        if (currentMode == SHOW_TIME || currentMode == SHOW_ALL){
+        if (currentMode == SHOW_TIME || currentMode == SHOW_ALL)
+        {
           getTime();
           CentreText(displayTime);
           if (currentMode == SHOW_TIME)
              dot(true);
-             delay(DELAY_TIME); // delay between scrolls or updates
+          delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){
           CentreText(getDay(false));
-          delay(DELAY_TIME); // delay between scrolls or updates
+          delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
           
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){ //check the mode again, in case it has changed
           CentreText(getDate());
-          delay(DELAY_TIME); // delay between scrolls or updates
+          delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
     }  
 
     if (currentMode == SHOW_TEMPERATURE || currentMode == SHOW_ALL)
     {
       CentreText(getTemperature());
-      delay(DELAY_TIME); // delay between scrolls or updates
+      delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
     }
 
     if (currentMode == SHOW_HUMIDITY || currentMode == SHOW_ALL)
     {
        CentreText(getHumidity());
-       delay(DELAY_TIME); // delay between scrolls or updates
+       delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
     }
     else if (currentMode == DEMO_MODE)
     {
@@ -1774,7 +1766,7 @@ void TriggerTask(void *pvParameters) {
       if (alarmMotionOn==1 && alarmBeeping)
       {
         alarmOn=0;
-        SaveInt("alarm_on", alarmOn);
+        SaveSetting("alarm_on", alarmOn);
         alarmBeeping=false;
       }
     }
@@ -1882,6 +1874,7 @@ void setup() {
     Serial.println("\nMD_MAX72XX initialization failed");
 
   GetIntensity();
+  mx.control(MD_MAX72XX::INTENSITY, intensity);
 
   CentreText("Wi-fi");
  
@@ -1892,7 +1885,6 @@ void setup() {
   sntp_servermode_dhcp(1);    // (optional)
   configTime(0, 0, ntpServer1, ntpServer2);
   SetTimezone(timeZone); //https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
-
 
   xTaskCreatePinnedToCore(DisplayTask, "DisplayTask", 4096, NULL, 1, &DisplayTask_Handle, 0);
   xTaskCreatePinnedToCore(TriggerTask, "TriggerTask", 4096, NULL, 2, &TriggerTask_Handle, 1);
