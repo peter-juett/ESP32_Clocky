@@ -710,7 +710,12 @@ bool bounce2()
 
 void dot(bool on)
 {
-  mx.setPoint(6, 1, true);
+  mx.setPoint(6, 1, on);
+}
+
+void AlarmDot(bool on)
+{
+  mx.setPoint(6, 30, on);
 }
 
 // Animation of a sine wave
@@ -1601,7 +1606,10 @@ void DisplayTask(void *pvParameters) {
           getTime();
           CentreText(displayTime);
           if (currentMode == SHOW_TIME)
-             dot(true);
+          {
+           dot(true);
+           AlarmDot(alarmOn==1);
+          }
           delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
         if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){
