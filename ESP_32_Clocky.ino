@@ -8,17 +8,12 @@
 #include <WiFiManager.h>
 #include <Preferences.h>
 #include "IRrecv.h"
-#include "DHT.h"
 #include <cmath> 
 #include <BH1750.h>
 #include <Wire.h>
 
-#define DHTPIN 32     // Digital pin connected to the DHT sensor
-//#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-#define DHTTYPE DHT11   // DHT 11
-
-#define  DELAY_TIME  100  // in milliseconds
-#define  SCREEN_DELAY_TIME  500  // in milliseconds
+#define DELAY_TIME  100  // in milliseconds
+#define SCREEN_DELAY_TIME  500  // in milliseconds
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES	4
 #define CS_PIN    5  
@@ -162,16 +157,11 @@ int LEDMotionOn;
 bool alarmBeeping = false;
 
 const int DEGREE_CHARACTER = 144;
-const int SHT31 = 1;
-const int AM2302 = 2;
-const int temperature_sensor = SHT31;
 
 // SPI hardware interface
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 
 Adafruit_SHT31 sht31; 
-
-DHT dht(DHTPIN, DHTTYPE);
 
 BH1750 lightMeter;
 
@@ -187,12 +177,10 @@ int currentMode;
 int hour24;
 int intensity;
 
-
-//String setupString = "";
-
 struct tm timeinfo;
 
 IRrecv irrecv(RECV_PIN);
+
 decode_results results;
 
 WiFiManager wifiManager; // Initialize WiFiManager
@@ -206,15 +194,10 @@ void timeavailable(struct timeval *t)
   strftime(displayTime, sizeof(displayTime), "%H:%M", &timeinfo);
 }
 
-void SetPriorityDisplay()
+void SetPriorityDisplay(bool on)
 {
-  priorityDisplaySet = true;
+  priorityDisplaySet = on;
 } 
-
-void ReleasePriorityDisplay()
-{
-  priorityDisplaySet = false;
-}
 
 void getTime()
 {
@@ -289,33 +272,17 @@ String getTemperature()
 {
   char displayTemperature[10]; 
 
-  if (temperature_sensor == SHT31)
-  {
-    if (celsius==1)
-      sprintf(displayTemperature, "%.1f%cC", sht31.readTemperature(), DEGREE_CHARACTER);
-    else
-      sprintf(displayTemperature, "%.0f%cF", ConvertTemperatureToF(sht31.readTemperature()), DEGREE_CHARACTER);
-  }
-   else
-  {
-   if (celsius)
-     sprintf(displayTemperature, "%.1f%cC", dht.readTemperature(), DEGREE_CHARACTER);
-   else 
-     sprintf(displayTemperature, "%.1f%cF", ConvertTemperatureToF(dht.readTemperature()), DEGREE_CHARACTER);
-  }
+  if (celsius==1)
+    sprintf(displayTemperature, "%.1f%cC", sht31.readTemperature(), DEGREE_CHARACTER);
+  else
+    sprintf(displayTemperature, "%.0f%cF", ConvertTemperatureToF(sht31.readTemperature()), DEGREE_CHARACTER);
+
   return String(displayTemperature);
 }
 
 String getHumidity()
 {
-   float humidityValue;
-    
-    if (temperature_sensor == SHT31)
-        humidityValue = sht31.readHumidity();
-    else
-        humidityValue = dht.readHumidity();
-
-    return String(humidityValue, 1) + "%";
+  return String(sht31.readHumidity(), 1) + "%";
 }
 
 void getLight()
@@ -1100,13 +1067,6 @@ void SaveSetting(const char * key, String value)
     preferences.end();
 }
 
-void GetIntensity()
-{ 
-    preferences.begin("Settings", false);
-    intensity = preferences.getInt("intensity", 0);
-    preferences.end(); // Close the Preferences object  
-}
-
 void GetAlarmString()
 { 
     preferences.begin("Settings", false);
@@ -1115,40 +1075,26 @@ void GetAlarmString()
     preferences.end();
 }
 
-void GetTimeZone()
+void GetSettings()
 { 
     preferences.begin("Settings", false);
     timeZone = preferences.getString("timezone", "JST-9"); 
-    Serial.println("TimeZone been retrieved -" + timeZone);
-    preferences.end();
-}
-
-void Get12_24Hour()
-{ 
-    preferences.begin("Settings", false);
-    hour24 = preferences.getInt("hour24", 1);
-    Serial.println("12_24 hour has been loaded");
-    Serial.println(hour24);
-    preferences.end();
-}
-
-void GetTemperatureScale()
-{ 
-    preferences.begin("Settings", false);
+    alarmOn = preferences.getInt("alarm_on", 0);
+    alarmMotionOn = preferences.getInt("alarm_motion_on", 0);
+    LEDMotionOn = preferences.getInt("motion_screen_on", 0);
     celsius = preferences.getInt("celsius", 1);
-    Serial.println("temperature_scale has been loaded");
-    Serial.println(celsius);
-
+    hour24 = preferences.getInt("hour24", 1);
+    intensity = preferences.getInt("intensity", 0);
     preferences.end();
 }
 
 void CentreTextPriority(const char * msg)
 {
-  SetPriorityDisplay();
+  SetPriorityDisplay(true);
   CentreText(msg, true);
   delay(SCREEN_DELAY_TIME);
-  ReleasePriorityDisplay();
-}
+  SetPriorityDisplay(false);
+ }
 
 void DisplayCurrentMode()
 {
@@ -1268,10 +1214,10 @@ void AddToAlarmString(String newChar)
 
 void ShowOK()
 {
-  SetPriorityDisplay(); 
+  SetPriorityDisplay(true); 
   CentreText(DISPLAY_MSG_OK, true);
   delay(SCREEN_DELAY_TIME); // delay between scrolls or updates 
-  ReleasePriorityDisplay(); 
+  SetPriorityDisplay(false); 
 }
 
 void DeleteFromAlarmString()
@@ -1302,8 +1248,6 @@ void checkIR() {
     char buffer[10]; // Assuming the number won't exceed 10 characters including the sign and null terminator
 
     if (irrecv.decode(&results)) {
-        //    if (results.value >> 32)  // print() & println() can't handle printing long longs. (uint64_t)
-        //      Serial.print((uint32_t) (results.value >> 32), HEX);  // print the first part of the message
         Serial.println((uint32_t)(results.value & 0xFFFFFFFF), HEX); // print the second part of the message
         
         keyHit =  (isValueInArray(results.value)); //Is it a recognised IR code (from the Clocky remote control)
@@ -1519,13 +1463,13 @@ void checkIR() {
             SetSaveandDisplayMode(DEMO_MODE);
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_STAR])
           {
-            SetPriorityDisplay();
+            SetPriorityDisplay(true);
             currentMode = SETUP_MODE; 
             setupStep=1;
             setupSubstep=0;
             CentreText(DISPLAY_MSG_SETUP, true);
             delay(1000);
-            ReleasePriorityDisplay(); 
+            SetPriorityDisplay(false); 
          }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_UP])
           {
@@ -1538,7 +1482,7 @@ void checkIR() {
                     Beep();
                     
                   delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
-                  ReleasePriorityDisplay(); 
+                  SetPriorityDisplay(false);
            }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_DOWN])
             {
@@ -1800,27 +1744,6 @@ void GetCurrentRemote()
     preferences.end(); // Close the Preferences object  
 }
 
-void GetAlarmOn()
-{ 
-    preferences.begin("Settings", false);
-    alarmOn = preferences.getInt("alarm_on", 0);
-    preferences.end(); // Close the Preferences object  
-}
-
-void GetAlarmMotionOn()
-{ 
-    preferences.begin("Settings", false);
-    alarmMotionOn = preferences.getInt("alarm_motion_on", 0);
-    preferences.end(); // Close the Preferences object  
-}
-
-void GetLEDMotionOn()
-{ 
-    preferences.begin("Settings", false);
-    LEDMotionOn = preferences.getInt("motion_screen_on", 0);
-    preferences.end(); // Close the Preferences object  
-}
-
 void SetTimezone(String timezone){
   timeZone = timezone;
   Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
@@ -1843,52 +1766,41 @@ void IRAM_ATTR detectsMovement() {
 
 void setup() {
   Serial.begin(9600);
-//  GetCurrentRemote();
-  GetTimeZone();
-  GetAlarmString();
-  GetAlarmOn();
-  GetAlarmMotionOn();
-  GetLEDMotionOn();
-  GetDisplayMode();
-  GetTemperatureScale();
-  Get12_24Hour();
-
-  pinMode(BUZZER_PIN, OUTPUT);
  
-  // PIR Motion Sensor mode INPUT_PULLUP
+  GetSettings();
+ 
+  GetAlarmString();
+  GetDisplayMode();
+ 
+  pinMode(BUZZER_PIN, OUTPUT);
   pinMode(PIR_PIN, INPUT_PULLDOWN);
+ 
   // Set motionSensor pin as interrupt, assign interrupt function and set RISING mode
   attachInterrupt(digitalPinToInterrupt(PIR_PIN), detectsMovement, RISING);
-
 
   Serial.println("Initializing I2C...");
   Wire.begin(SDA_PIN, SCL_PIN);
  
   lightMeter.begin();
 
-  if (temperature_sensor == SHT31)
+  sht31 = Adafruit_SHT31();
+  Serial.println("Initializing SHT31 sensor...");
+  if (!sht31.begin(0x44)) 
   {
-    sht31 = Adafruit_SHT31();
-    Serial.println("Initializing SHT31 sensor...");
-    if (!sht31.begin(0x44)) {
-      Serial.println("Couldn't find SHT31 sensor, check wiring!");
-      while (1);
-    }
-  }  
-  else
-    dht.begin();
-
+    Serial.println("Couldn't find SHT31 sensor, check wiring!");
+    while (1);
+  }
+  
   if (!mx.begin())
     Serial.println("\nMD_MAX72XX initialization failed");
 
-  GetIntensity();
-  mx.control(MD_MAX72XX::INTENSITY, intensity);
+   mx.control(MD_MAX72XX::INTENSITY, intensity);
 
   CentreText("Wi-fi");
  
   wifiManager.autoConnect("Clocky"); // Connect to saved network or create AP
  
- // set notification call-back function
+  // set notification call-back function
   sntp_set_time_sync_notification_cb( timeavailable );
   sntp_servermode_dhcp(1);    // (optional)
   configTime(0, 0, ntpServer1, ntpServer2);
@@ -1897,7 +1809,7 @@ void setup() {
   xTaskCreatePinnedToCore(DisplayTask, "DisplayTask", 4096, NULL, 1, &DisplayTask_Handle, 0);
   xTaskCreatePinnedToCore(TriggerTask, "TriggerTask", 4096, NULL, 2, &TriggerTask_Handle, 1);
 
-   Beep();  
+  Beep();  
 }
 
 void loop() {
