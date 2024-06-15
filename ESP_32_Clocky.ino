@@ -13,6 +13,7 @@
 #include <Wire.h>
 
 #define DELAY_TIME  100  // in milliseconds
+#define SCROLL_DELAY_TIME 50
 #define SCREEN_DELAY_TIME  500  // in milliseconds
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES	4
@@ -61,20 +62,6 @@ int current_remote = 0; //TODO - make this configurable
 int celsius; 
 bool priorityDisplaySet = false;
 
-// Define constants for button press messages
-const char* BUTTON_PRESS_MSG_0 = "Pressed 0";
-const char* BUTTON_PRESS_MSG_1 = "Pressed 1";
-const char* BUTTON_PRESS_MSG_2 = "Pressed 2";
-const char* BUTTON_PRESS_MSG_3 = "Pressed 3";
-const char* BUTTON_PRESS_MSG_4 = "Pressed 4";
-const char* BUTTON_PRESS_MSG_5 = "Pressed 5";
-const char* BUTTON_PRESS_MSG_6 = "Pressed 6";
-const char* BUTTON_PRESS_MSG_STAR = "Pressed *";
-const char* BUTTON_PRESS_MSG_HASH = "Pressed #";
-const char* BUTTON_PRESS_MSG_UP = "Pressed Up";
-const char* BUTTON_PRESS_MSG_DOWN = "Pressed Down";
-const char* BUTTON_PRESS_MSG_LEFT = "Pressed Left";
-const char* BUTTON_PRESS_MSG_RIGHT = "Pressed Right";
 const char* BUTTON_PRESS_MSG_DEFAULT = "Unexpected button press";
 
 const char* DISPLAY_MSG_OFF = "Off";
@@ -92,21 +79,19 @@ const char* DISPLAY_MSG_12HR = "12 hr?";
 const char* DISPLAY_MSG_ALARM = "Alarm";
 const char* DISPLAY_MSG_ALARM_ON  = "On?";
 const char* DISPLAY_MSG_ALARM_OFF  = "Off?";
-const char* DISPLAY_MSG_ALARM_MOTION_ON  = "Alarm Motion On?";
-const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "Alarm Motion Off?";
-const char* DISPLAY_MSG_PIR = "PIR";
-const char* DISPLAY_MSG_LED_MOTION_ON  = "LED Motion On?";
-const char* DISPLAY_MSG_LED_MOTION_OFF  = "LED Motion Off?";
-const char* DISPLAY_MSG_12_24_HR = "12|24";
+const char* DISPLAY_MSG_ALARM_MOTION_ON  = "PIR+?";
+const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "PIR-?";
+const char* DISPLAY_MSG_PIR = "Display";
+const char* DISPLAY_MSG_DISPLAY_MOTION_ON  = "PIR+?";
+const char* DISPLAY_MSG_DISPLAY_MOTION_OFF  = "PIR-?";
+const char* DISPLAY_MSG_12_24_HR = "12/24";
 const char* DISPLAY_MSG_WIFI = "Wi-Fi";
 const char* DISPLAY_MSG_RESET = "Reset?";
-const char* DISPLAY_MSG_C_F = "C/F";
-const char* DISPLAY_MSG_C = "C?";
-const char* DISPLAY_MSG_F = "F?";
-const char* DISPLAY_MSG_ZONE = "Zone?";
+const int DEGREE_CHARACTER = 144;
+const char* DISPLAY_MSG_ZONE = "TZone";
 const char* DISPLAY_MSG_TK = "Tokyo?";
 const char* DISPLAY_MSG_UK = "UK?";
-const char* DISPLAY_MSG_HK = "Hong Kong?";
+const char* DISPLAY_MSG_HK = "HK?";
 const char* DISPLAY_MSG_EXIT = "Exit?";
 const char* DISPLAY_MSG_OK = "OK";
 
@@ -130,11 +115,11 @@ const int SETUP_STEP_ALARM_SUBSTEP_3_MOTION_OFF = 3;
 const int SETUP_STEP_12_24 = 2;
 const int SETUP_STEP_WIFI = 3;
 const int SETUP_STEP_C_F = 4;
-const int SETUP_STEP_PIR = 5;
+const int SETUP_STEP_DISPLAY = 5;
 const int SETUP_STEP_ZONE = 6;
 const int SETUP_STEP_EXIT = 7;
 
-const int SETUP_SUBSTEPS[8] = {0,3,1,1,1,2,3,0};
+const int SETUP_SUBSTEPS[8] = {0,3,1,1,1,1,3,0};
 
 const int SETUP_MAX = 7; 
 
@@ -153,10 +138,9 @@ int setupStep = 1;
 int setupSubstep = 0;
 int alarmOn;
 int alarmMotionOn;
-int LEDMotionOn;
+int DisplayMotionOn;
 bool alarmBeeping = false;
 
-const int DEGREE_CHARACTER = 144;
 
 // SPI hardware interface
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
@@ -379,7 +363,7 @@ void CentreText(const String &p, bool PriorityDisplay = false)
     delay(DELAY_TIME * 5);
 }
 
-void ScrollText(const char *p)
+void ScrollText(const char *p, bool slow = false)
 {
   uint8_t charWidth;
   uint8_t cBuf[8];  // this should be ok for all built-in fonts
@@ -412,7 +396,10 @@ void ScrollText(const char *p)
       else 
          mx.setColumn(0, 0);
   
-      delay(DELAY_TIME);
+      if (slow)
+        delay(SCROLL_DELAY_TIME*2);
+      else   
+        delay(SCROLL_DELAY_TIME);
     }
   }
 }
@@ -1081,7 +1068,7 @@ void GetSettings()
     timeZone = preferences.getString("timezone", "JST-9"); 
     alarmOn = preferences.getInt("alarm_on", 0);
     alarmMotionOn = preferences.getInt("alarm_motion_on", 0);
-    LEDMotionOn = preferences.getInt("motion_screen_on", 0);
+    DisplayMotionOn = preferences.getInt("motion_screen_on", 0);
     celsius = preferences.getInt("celsius", 1);
     hour24 = preferences.getInt("hour24", 1);
     intensity = preferences.getInt("intensity", 0);
@@ -1272,7 +1259,7 @@ void checkIR() {
             GetDisplayMode(); //restore the previous mode
             GetAlarmString(); //restore the previous alarm string
           }
-          else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_UP])
+          else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_DOWN])
           {
             if (setupStep < SETUP_MAX) 
               setupStep++;
@@ -1281,7 +1268,7 @@ void checkIR() {
 
             setupSubstep=0;  
           }
-          else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_DOWN])
+          else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_UP])
           {
             if (setupStep > 1) 
               setupStep--;
@@ -1352,26 +1339,16 @@ void checkIR() {
              SaveSetting("celsius", celsius);
              ShowOK();
            }
-           else if (setupStep==SETUP_STEP_PIR)
+           else if (setupStep==SETUP_STEP_DISPLAY)
            {
-                 if (setupSubstep==1) //Alarm Off with PIR
+                 if (setupSubstep==1) //Screen On with PIR
                  {
-                   if (alarmMotionOn==1)
-                     alarmMotionOn=0;
+                  if (DisplayMotionOn==1)
+                     DisplayMotionOn=0;
                    else
-                     alarmMotionOn=1;
+                     DisplayMotionOn=1;
                
-                   SaveSetting("alarm_motion_on", alarmMotionOn);
-                   ShowOK();
-                 }
-                 else if (setupSubstep==2) //Screen On with PIR
-                 {
-                  if (LEDMotionOn==1)
-                     LEDMotionOn=0;
-                   else
-                     LEDMotionOn=1;
-               
-                   SaveSetting("motion_screen_on", LEDMotionOn);
+                   SaveSetting("motion_screen_on", DisplayMotionOn);
                    ShowOK();
                  }
            }
@@ -1521,7 +1498,7 @@ void checkIR() {
 // Task function for Task1
 void DisplayTask(void *pvParameters) {
  
-  ScrollText("Welcome to Clocky!");
+  ScrollText("Welcome to Clocky!", true);
   delay(SCREEN_DELAY_TIME);
   columns2(false);
   
@@ -1601,9 +1578,9 @@ void DisplayTask(void *pvParameters) {
         else if (setupSubstep==SETUP_STEP_ALARM_SUBSTEP_3_MOTION_OFF)
         {
           if(alarmMotionOn)
-            ScrollText(DISPLAY_MSG_ALARM_MOTION_OFF);      
+            CentreText(DISPLAY_MSG_ALARM_MOTION_OFF);      
           else 
-            ScrollText(DISPLAY_MSG_ALARM_MOTION_ON);      
+            CentreText(DISPLAY_MSG_ALARM_MOTION_ON);      
         } 
       }
       else if (setupStep==SETUP_STEP_12_24)
@@ -1628,32 +1605,37 @@ void DisplayTask(void *pvParameters) {
       else if (setupStep==SETUP_STEP_C_F)
       {
        if (setupSubstep==0)
-         CentreText(DISPLAY_MSG_C_F);
+       {
+        char cBuffer[5];
+        sprintf(cBuffer, "%cC/%cF", DEGREE_CHARACTER, DEGREE_CHARACTER);
+        CentreText(cBuffer);
+       }
        else if (setupSubstep==1)
        {
          if (celsius==1)
-           CentreText(DISPLAY_MSG_F);
+         {
+           char cBuffer[5];
+           sprintf(cBuffer, "%cF?", DEGREE_CHARACTER);
+           CentreText(cBuffer);
+         }
          else
-           CentreText(DISPLAY_MSG_C);
+         {
+           char cBuffer[5];
+           sprintf(cBuffer, "%cC?", DEGREE_CHARACTER);
+           CentreText(cBuffer);
+         }
        }
       }
-      else if (setupStep==SETUP_STEP_PIR)
+      else if (setupStep==SETUP_STEP_DISPLAY)
       {
         if (setupSubstep==0)
           CentreText(DISPLAY_MSG_PIR);
         else if (setupSubstep==1)
         {
-           if(alarmMotionOn)
-            ScrollText(DISPLAY_MSG_ALARM_MOTION_OFF);      
+          if(DisplayMotionOn)
+            CentreText(DISPLAY_MSG_DISPLAY_MOTION_OFF);      
           else 
-            ScrollText(DISPLAY_MSG_ALARM_MOTION_ON);      
-        } 
-        else if (setupSubstep==2)
-        {
-          if(LEDMotionOn)
-            ScrollText(DISPLAY_MSG_LED_MOTION_OFF);      
-          else 
-            ScrollText(DISPLAY_MSG_LED_MOTION_ON);         
+            CentreText(DISPLAY_MSG_DISPLAY_MOTION_ON);         
         }
       }
       else if (setupStep==SETUP_STEP_ZONE)
@@ -1665,7 +1647,7 @@ void DisplayTask(void *pvParameters) {
         else if (setupSubstep==2)
           CentreText(DISPLAY_MSG_UK);
         else if (setupSubstep==3)
-          ScrollText(DISPLAY_MSG_HK);
+          CentreText(DISPLAY_MSG_HK);
       }
      else if (setupStep==SETUP_STEP_EXIT)
       {
@@ -1726,7 +1708,7 @@ void TriggerTask(void *pvParameters) {
     getLight();
 
     // Check if screensaver should be activated
-    Screensaver = (LEDMotionOn==1 && ((millis() - lastMovementTime) > screensaverTimeout));
+    Screensaver = (DisplayMotionOn==1 && ((millis() - lastMovementTime) > screensaverTimeout));
   }
 }
 
