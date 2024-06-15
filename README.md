@@ -56,7 +56,7 @@ To use Clocky, you will need the following:
 1. Power on your Clocky device.
 2. The clock will start displaying the time and other information based on the selected mode.
 3. Use the Infrared remote control buttons to switch between modes or configure settings.
-4. Customize the code to add new features or modify existing ones according to your requirements.
+4. If you wish, customize the code to add new features or modify existing ones according to your requirements.
 
 ## Contributing
 
