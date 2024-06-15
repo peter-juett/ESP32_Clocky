@@ -33,7 +33,7 @@ Clocky is a customizable digital clock project designed for ESP32 microcontrolle
 To use Clocky, you will need the following:
 
 - ESP32 development board.
-- Sensors such as SHT31, DHT11/DHT22 for temperature and humidity sensing.
+- Sensors including SHT31 for temperature and humidity sensing and GY30 for light.
 - LED matrix display compatible with the MD_MAX72XX library.
 - Arduino IDE for development.
 - Necessary libraries (see the "Installed Libraries" file for details).
