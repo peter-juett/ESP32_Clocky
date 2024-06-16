@@ -70,6 +70,7 @@ const char* DISPLAY_MSG_TEMPERATURE = "Temp";
 const char* DISPLAY_MSG_HUMIDITY = "Humid";
 const char* DISPLAY_MSG_DATE = "Date";
 const char* DISPLAY_MSG_ALL = "ALL";
+const char* DISPLAY_MSG_ALL2 = "ALL2";
 const char* DISPLAY_MSG_SCROLL = "Scroll";
 const char* DISPLAY_MSG_DEMO = "Demo";
 const char* DISPLAY_MSG_SETUP = "Setup";
@@ -79,11 +80,11 @@ const char* DISPLAY_MSG_12HR = "12 hr?";
 const char* DISPLAY_MSG_ALARM = "Alarm";
 const char* DISPLAY_MSG_ALARM_ON  = "On?";
 const char* DISPLAY_MSG_ALARM_OFF  = "Off?";
-const char* DISPLAY_MSG_ALARM_MOTION_ON  = "PIR+?";
-const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "PIR-?";
+const char* DISPLAY_MSG_ALARM_MOTION_ON  = "Motion+?";
+const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "Motion-?";
 const char* DISPLAY_MSG_PIR = "Display";
-const char* DISPLAY_MSG_DISPLAY_MOTION_ON  = "PIR+?";
-const char* DISPLAY_MSG_DISPLAY_MOTION_OFF  = "PIR-?";
+const char* DISPLAY_MSG_DISPLAY_MOTION_ON  = "Motion+?";
+const char* DISPLAY_MSG_DISPLAY_MOTION_OFF  = "Motion-?";
 const char* DISPLAY_MSG_12_24_HR = "12/24";
 const char* DISPLAY_MSG_WIFI = "Wi-Fi";
 const char* DISPLAY_MSG_RESET = "Reset?";
@@ -102,9 +103,10 @@ const int SHOW_DATE = 2;
 const int SHOW_TEMPERATURE = 3;
 const int SHOW_HUMIDITY = 4;
 const int SHOW_ALL = 5;
-const int SCROLL_ALL = 6;
-const int DEMO_MODE = 7;
-const int SETUP_MODE = 8;
+const int SHOW_ALL2 = 6;
+const int SCROLL_ALL = 7;
+const int DEMO_MODE = 8;
+const int SETUP_MODE = 9;
 
 const int SETUP_STEP_ALARM = 1;
 const int SETUP_STEP_ALARM_SUBSTEP_0_DISPLAY_ALARM = 0;
@@ -1104,6 +1106,9 @@ void DisplayCurrentMode()
      case SHOW_ALL:
           CentreTextPriority(DISPLAY_MSG_ALL);
           break;
+     case SHOW_ALL2:
+          CentreTextPriority(DISPLAY_MSG_ALL2);
+          break;
     case SCROLL_ALL:
           CentreText(DISPLAY_MSG_SCROLL);
           break;
@@ -1435,6 +1440,8 @@ void checkIR() {
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_5])
             SetSaveandDisplayMode(SHOW_ALL);
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_6])
+            SetSaveandDisplayMode(SHOW_ALL2);
+          else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_7])
             SetSaveandDisplayMode(SCROLL_ALL);
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_9])
             SetSaveandDisplayMode(DEMO_MODE);
@@ -1473,23 +1480,18 @@ void checkIR() {
               }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_LEFT])
             {
-                    if (currentMode > 0){
-                      SetSaveandDisplayMode(currentMode-1);
-                    } 
-                    else
-                      SetSaveandDisplayMode(6);
+              if (currentMode > 0)
+                SetSaveandDisplayMode(currentMode-1);
+              else
+                SetSaveandDisplayMode(7);
             }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_RIGHT])
             {
-                    if (currentMode < 6) 
-                      SetSaveandDisplayMode(currentMode+1);
-                    else
-                      SetSaveandDisplayMode(0);
+              if (currentMode < 7) 
+                SetSaveandDisplayMode(currentMode+1);
+              else
+                SetSaveandDisplayMode(0);
             }
-        else
-        {
-              Serial.println(BUTTON_PRESS_MSG_DEFAULT);
-        }  
      }
      irrecv.resume(); // Receive the next value
     }
@@ -1520,9 +1522,9 @@ void DisplayTask(void *pvParameters) {
       continue;
     } 
     
-    if (currentMode == SHOW_TIME || currentMode == SHOW_DATE || currentMode == SHOW_ALL || currentMode == SCROLL_ALL)
+    if (currentMode == SHOW_TIME || currentMode == SHOW_DATE || currentMode == SHOW_ALL || currentMode == SHOW_ALL2 || currentMode == SCROLL_ALL)
     {
-        if (currentMode == SHOW_TIME || currentMode == SHOW_ALL)
+        if (currentMode == SHOW_TIME || currentMode == SHOW_ALL || currentMode == SHOW_ALL2)
         {
           getTime();
           CentreText(displayTime);
@@ -1533,24 +1535,31 @@ void DisplayTask(void *pvParameters) {
           }
           delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
-        if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){
-          CentreText(getDay(false));
+        if (currentMode == SHOW_DATE || currentMode == SHOW_ALL || currentMode == SHOW_ALL2){
+          if (currentMode == SHOW_ALL2)
+             ScrollText(getDay(true).c_str());
+          else   
+             CentreText(getDay(false));
           delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
           
-        if (currentMode == SHOW_DATE || currentMode == SHOW_ALL){ //check the mode again, in case it has changed
-          CentreText(getDate());
+        if (currentMode == SHOW_DATE || currentMode == SHOW_ALL || currentMode == SHOW_ALL2) //check the mode again, in case it has changed
+        {
+          if (currentMode == SHOW_ALL2)
+            RightUp(getDate().c_str());
+          else
+            CentreText(getDate());
           delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
         }
     }  
 
-    if (currentMode == SHOW_TEMPERATURE || currentMode == SHOW_ALL)
+    if (currentMode == SHOW_TEMPERATURE || currentMode == SHOW_ALL || currentMode == SHOW_ALL2)
     {
       CentreText(getTemperature());
       delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
     }
 
-    if (currentMode == SHOW_HUMIDITY || currentMode == SHOW_ALL)
+    if (currentMode == SHOW_HUMIDITY || currentMode == SHOW_ALL || currentMode == SHOW_ALL2)
     {
        CentreText(getHumidity());
        delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
