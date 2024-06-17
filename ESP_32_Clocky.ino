@@ -80,7 +80,7 @@ const char* DISPLAY_MSG_12HR = "12 hr?";
 const char* DISPLAY_MSG_ALARM = "Alarm";
 const char* DISPLAY_MSG_ALARM_ON  = "On?";
 const char* DISPLAY_MSG_ALARM_OFF  = "Off?";
-const char* DISPLAY_MSG_ALARM_MOTION_ON  = "Motion+?";
+const char* DISPLAY_MSG_ALARM_SCREEN_ON  = "Motion+?";
 const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "Motion-?";
 const char* DISPLAY_MSG_PIR = "Display";
 const char* DISPLAY_MSG_DISPLAY_MOTION_ON  = "Mtn+?";
@@ -89,6 +89,9 @@ const char* DISPLAY_MSG_DISPLAY_MOTION_DARK  = "Mtndk?";
 const int DISPLAY_MOTION_OFF = 0;
 const int DISPLAY_MOTION_ON = 1;
 const int DISPLAY_MOTION_DARK = 2;
+
+const int LIGHT_LEVEL_DARK = 5;
+const int LIGHT_LEVEL_LOW = 20;
 
 const char* DISPLAY_MSG_12_24_HR = "12/24";
 const char* DISPLAY_MSG_WIFI = "Wi-Fi";
@@ -283,11 +286,7 @@ void getLight()
   
   lightLevel = lightMeter.readLightLevel();
 
-  Serial.print("lightLevel-");
-    Serial.println(lightLevel);
- 
- 
-  if (lightLevel < 20)
+  if (lightLevel < LIGHT_LEVEL_LOW)
     mx.control(MD_MAX72XX::INTENSITY, 0);
   else
     mx.control(MD_MAX72XX::INTENSITY, intensity);
@@ -297,7 +296,7 @@ void getLight()
 
 bool IsDark()
 {
-  return (lightLevel < 5);
+  return (lightLevel < LIGHT_LEVEL_DARK);
 }
 
 void CentreText(const char *p, bool PriorityDisplay = false)
@@ -1059,7 +1058,6 @@ void SaveSetting(const char * key, int value)
 { 
     preferences.begin("Settings", false);
     preferences.putInt(key, value); 
-    Serial.println(String(key) + " has been Saved");
     preferences.end();
 }
 
@@ -1067,7 +1065,6 @@ void SaveSetting(const char * key, String value)
 { 
     preferences.begin("Settings", false);
     preferences.putString(key, value); 
-    Serial.println(String(key) + " has been Saved");
     preferences.end();
 }
 
@@ -1084,8 +1081,10 @@ void GetSettings()
     preferences.begin("Settings", false);
     timeZone = preferences.getString("timezone", "JST-9"); 
     alarmOn = preferences.getInt("alarm_on", 0);
-    alarmMotionOn = preferences.getInt("alarm_motion_on", 0);
-    DisplayMotionOn = preferences.getInt("motion_screen_on", DISPLAY_MOTION_OFF);
+    alarmMotionOn = preferences.getInt("al_screen_on", 0);
+    DisplayMotionOn = preferences.getInt("m_screen_on", DISPLAY_MOTION_OFF);
+    Serial.print("DisplayMotionOn");
+    Serial.println(DisplayMotionOn);
     celsius = preferences.getInt("celsius", 1);
     hour24 = preferences.getInt("hour24", 1);
     intensity = preferences.getInt("intensity", 0);
@@ -1255,8 +1254,7 @@ void checkIR() {
     char buffer[10]; // Assuming the number won't exceed 10 characters including the sign and null terminator
 
     if (irrecv.decode(&results)) {
-        Serial.println((uint32_t)(results.value & 0xFFFFFFFF), HEX); // print the second part of the message
-        
+         
         keyHit =  (isValueInArray(results.value)); //Is it a recognised IR code (from the Clocky remote control)
 
         if(alarmBeeping)
@@ -1331,7 +1329,7 @@ void checkIR() {
                 else
                   alarmMotionOn=1;
                
-                SaveSetting("alarm_motion_on", alarmMotionOn);
+                SaveSetting("al_screen_on", alarmMotionOn);
                 ShowOK();
               }
            }
@@ -1361,7 +1359,7 @@ void checkIR() {
            }
            else if (setupStep==SETUP_STEP_DISPLAY)
            {
-                 if (setupSubstep==1) //Screen On with PIR
+                 if (setupSubstep==1) //Screen On with motion
                  {
                   switch (DisplayMotionOn) 
                   {
@@ -1371,11 +1369,11 @@ void checkIR() {
                     case DISPLAY_MOTION_ON:
                       DisplayMotionOn = DISPLAY_MOTION_DARK;
                       break;
-                    default:
+                    case DISPLAY_MOTION_DARK:
                       DisplayMotionOn = DISPLAY_MOTION_OFF;
                       break;
                   }
-                  SaveSetting("motion_screen_on", DisplayMotionOn);
+                   SaveSetting("m_screen_on", DisplayMotionOn);
                    ShowOK();
                  }
            }
@@ -1611,7 +1609,7 @@ void DisplayTask(void *pvParameters) {
           if(alarmMotionOn)
             CentreText(DISPLAY_MSG_ALARM_MOTION_OFF);      
           else 
-            CentreText(DISPLAY_MSG_ALARM_MOTION_ON);      
+            CentreText(DISPLAY_MSG_ALARM_SCREEN_ON);      
         } 
       }
       else if (setupStep==SETUP_STEP_12_24)
@@ -1671,7 +1669,7 @@ void DisplayTask(void *pvParameters) {
             case DISPLAY_MOTION_ON:
               CentreText(DISPLAY_MSG_DISPLAY_MOTION_DARK);
               break;
-            default:
+            case DISPLAY_MOTION_DARK:
               CentreText(DISPLAY_MSG_DISPLAY_MOTION_OFF);
               break;
           }
@@ -1709,8 +1707,8 @@ void DisplayTask(void *pvParameters) {
    
     getLight();
 
-    Serial.print("DisplayMotionOn-");
-    Serial.println(DisplayMotionOn);
+ //  Serial.print("DisplayMotionOn-");
+ //   Serial.println(DisplayMotionOn);
  
     vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
@@ -1753,6 +1751,13 @@ void TriggerTask(void *pvParameters) {
     bool isMotionOn = (DisplayMotionOn == DISPLAY_MOTION_ON);
     bool isDarkAndMotionDark = (DisplayMotionOn == DISPLAY_MOTION_DARK && IsDark());
     bool isScreenSaverTimeout = ((millis() - lastMovementTime) > screenSaverTimeout);
+
+  //  Serial.print("DisplayMotionOn");
+  //  Serial.println(DisplayMotionOn);
+
+ //Serial.print("isDarkAndMotionDark");
+  //  Serial.println(isDarkAndMotionDark);
+
 
     screenSaver = (isMotionOn || isDarkAndMotionDark) && isScreenSaverTimeout;
 
