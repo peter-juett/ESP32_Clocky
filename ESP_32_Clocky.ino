@@ -83,8 +83,13 @@ const char* DISPLAY_MSG_ALARM_OFF  = "Off?";
 const char* DISPLAY_MSG_ALARM_MOTION_ON  = "Motion+?";
 const char* DISPLAY_MSG_ALARM_MOTION_OFF  = "Motion-?";
 const char* DISPLAY_MSG_PIR = "Display";
-const char* DISPLAY_MSG_DISPLAY_MOTION_ON  = "Motion+?";
-const char* DISPLAY_MSG_DISPLAY_MOTION_OFF  = "Motion-?";
+const char* DISPLAY_MSG_DISPLAY_MOTION_ON  = "Mtn+?";
+const char* DISPLAY_MSG_DISPLAY_MOTION_OFF  = "Mtn-?";
+const char* DISPLAY_MSG_DISPLAY_MOTION_DARK  = "Mtndk?";
+const int DISPLAY_MOTION_OFF = 0;
+const int DISPLAY_MOTION_ON = 1;
+const int DISPLAY_MOTION_DARK = 2;
+
 const char* DISPLAY_MSG_12_24_HR = "12/24";
 const char* DISPLAY_MSG_WIFI = "Wi-Fi";
 const char* DISPLAY_MSG_RESET = "Reset?";
@@ -133,8 +138,9 @@ bool keyHit = false;
 unsigned long lastMovementTime = 0;
 unsigned long lastLightCheckTime = 0;
 unsigned long lightCheckPeriod = 1000;
-const unsigned long screensaverTimeout = 60000; // 1 minute
-bool Screensaver = false;
+const unsigned long screenSaverTimeout = 60000; // 1 minute
+bool screenSaver = false;
+float lightLevel = 0;
  
 int setupStep = 1;
 int setupSubstep = 0;
@@ -275,14 +281,23 @@ void getLight()
 {
   if ((millis() - lastLightCheckTime) < lightCheckPeriod) return;
   
-  float lux = lightMeter.readLightLevel();
+  lightLevel = lightMeter.readLightLevel();
+
+  Serial.print("lightLevel-");
+    Serial.println(lightLevel);
  
-  if (lux < 20)
+ 
+  if (lightLevel < 20)
     mx.control(MD_MAX72XX::INTENSITY, 0);
   else
     mx.control(MD_MAX72XX::INTENSITY, intensity);
 
   lastLightCheckTime = millis();
+}
+
+bool IsDark()
+{
+  return (lightLevel < 5);
 }
 
 void CentreText(const char *p, bool PriorityDisplay = false)
@@ -1070,7 +1085,7 @@ void GetSettings()
     timeZone = preferences.getString("timezone", "JST-9"); 
     alarmOn = preferences.getInt("alarm_on", 0);
     alarmMotionOn = preferences.getInt("alarm_motion_on", 0);
-    DisplayMotionOn = preferences.getInt("motion_screen_on", 0);
+    DisplayMotionOn = preferences.getInt("motion_screen_on", DISPLAY_MOTION_OFF);
     celsius = preferences.getInt("celsius", 1);
     hour24 = preferences.getInt("hour24", 1);
     intensity = preferences.getInt("intensity", 0);
@@ -1348,12 +1363,19 @@ void checkIR() {
            {
                  if (setupSubstep==1) //Screen On with PIR
                  {
-                  if (DisplayMotionOn==1)
-                     DisplayMotionOn=0;
-                   else
-                     DisplayMotionOn=1;
-               
-                   SaveSetting("motion_screen_on", DisplayMotionOn);
+                  switch (DisplayMotionOn) 
+                  {
+                    case DISPLAY_MOTION_OFF:
+                      DisplayMotionOn = DISPLAY_MOTION_ON;
+                      break;
+                    case DISPLAY_MOTION_ON:
+                      DisplayMotionOn = DISPLAY_MOTION_DARK;
+                      break;
+                    default:
+                      DisplayMotionOn = DISPLAY_MOTION_OFF;
+                      break;
+                  }
+                  SaveSetting("motion_screen_on", DisplayMotionOn);
                    ShowOK();
                  }
            }
@@ -1515,7 +1537,7 @@ void DisplayTask(void *pvParameters) {
     if (currentMode == SHOW_NOTHING)
          mx.clear();
     
-    if (Screensaver && currentMode != SETUP_MODE)
+    if (screenSaver && currentMode != SETUP_MODE)
     {
       mx.clear();
       delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
@@ -1641,10 +1663,18 @@ void DisplayTask(void *pvParameters) {
           CentreText(DISPLAY_MSG_PIR);
         else if (setupSubstep==1)
         {
-          if(DisplayMotionOn)
-            CentreText(DISPLAY_MSG_DISPLAY_MOTION_OFF);      
-          else 
-            CentreText(DISPLAY_MSG_DISPLAY_MOTION_ON);         
+          switch (DisplayMotionOn) 
+          {
+            case DISPLAY_MOTION_OFF:
+              CentreText(DISPLAY_MSG_DISPLAY_MOTION_ON);
+              break;
+            case DISPLAY_MOTION_ON:
+              CentreText(DISPLAY_MSG_DISPLAY_MOTION_DARK);
+              break;
+            default:
+              CentreText(DISPLAY_MSG_DISPLAY_MOTION_OFF);
+              break;
+          }
         }
       }
       else if (setupStep==SETUP_STEP_ZONE)
@@ -1678,6 +1708,9 @@ void DisplayTask(void *pvParameters) {
     } 
    
     getLight();
+
+    Serial.print("DisplayMotionOn-");
+    Serial.println(DisplayMotionOn);
  
     vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
@@ -1716,9 +1749,14 @@ void TriggerTask(void *pvParameters) {
     //Check light level and adjust display if required
     getLight();
 
-    // Check if screensaver should be activated
-    Screensaver = (DisplayMotionOn==1 && ((millis() - lastMovementTime) > screensaverTimeout));
-  }
+    // Check if screenSaver should be activated
+    bool isMotionOn = (DisplayMotionOn == DISPLAY_MOTION_ON);
+    bool isDarkAndMotionDark = (DisplayMotionOn == DISPLAY_MOTION_DARK && IsDark());
+    bool isScreenSaverTimeout = ((millis() - lastMovementTime) > screenSaverTimeout);
+
+    screenSaver = (isMotionOn || isDarkAndMotionDark) && isScreenSaverTimeout;
+
+   }
 }
 
 void GetDisplayMode()
