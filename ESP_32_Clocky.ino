@@ -285,7 +285,7 @@ void getLight()
   if ((millis() - lastLightCheckTime) < lightCheckPeriod) return;
   
   lightLevel = lightMeter.readLightLevel();
-
+ 
   if (lightLevel < LIGHT_LEVEL_LOW)
     mx.control(MD_MAX72XX::INTENSITY, 0);
   else
@@ -1537,6 +1537,8 @@ void DisplayTask(void *pvParameters) {
     
     if (screenSaver && currentMode != SETUP_MODE)
     {
+      if (alarmOn==1)
+        getTime(); //Still need to check the time for the alarm
       mx.clear();
       delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
       continue;
@@ -1705,11 +1707,6 @@ void DisplayTask(void *pvParameters) {
         delay(100); // delay between scrolls or updates
     } 
    
-    getLight();
-
- //  Serial.print("DisplayMotionOn-");
- //   Serial.println(DisplayMotionOn);
- 
     vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
   } //For loop forever
@@ -1722,9 +1719,9 @@ void TriggerTask(void *pvParameters) {
     checkIR();
     vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
-    if (alarmOn==1 && strcmp(displayTime, alarmString.c_str()) == 0) 
-      alarmBeeping=true; //switch on the alarm beeping
-
+    alarmBeeping = (alarmOn==1 && strcmp(displayTime, alarmString.c_str()) == 0); 
+    Serial.println("checked Alarm");
+  
     if (alarmBeeping)
     {
       Serial.println("Alarm beeping");
@@ -1755,8 +1752,8 @@ void TriggerTask(void *pvParameters) {
   //  Serial.print("DisplayMotionOn");
   //  Serial.println(DisplayMotionOn);
 
- //Serial.print("isDarkAndMotionDark");
-  //  Serial.println(isDarkAndMotionDark);
+ //   Serial.print("isDarkAndMotionDark");
+ //   Serial.println(isDarkAndMotionDark);
 
 
     screenSaver = (isMotionOn || isDarkAndMotionDark) && isScreenSaverTimeout;
