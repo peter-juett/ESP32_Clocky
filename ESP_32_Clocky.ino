@@ -90,7 +90,7 @@ const int DISPLAY_MOTION_OFF = 0;
 const int DISPLAY_MOTION_ON = 1;
 const int DISPLAY_MOTION_DARK = 2;
 
-const int LIGHT_LEVEL_DARK = 5;
+const int LIGHT_LEVEL_DARK = 1;
 const int LIGHT_LEVEL_LOW = 20;
 
 const char* DISPLAY_MSG_12_24_HR = "12/24";
@@ -285,7 +285,9 @@ void getLight()
   if ((millis() - lastLightCheckTime) < lightCheckPeriod) return;
   
   lightLevel = lightMeter.readLightLevel();
- 
+
+ // Serial.println(lightLevel);
+
   if (lightLevel < LIGHT_LEVEL_LOW)
     mx.control(MD_MAX72XX::INTENSITY, 0);
   else
@@ -1256,7 +1258,7 @@ void checkIR() {
     if (irrecv.decode(&results)) {
          
         keyHit =  (isValueInArray(results.value)); //Is it a recognised IR code (from the Clocky remote control)
-
+        Serial.println                              (results.value);
         if(alarmBeeping)
         {
             if (isValueInArray(results.value)) //Is it a recognised IR code (from the Clocky remote control)
@@ -1720,8 +1722,7 @@ void TriggerTask(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(100)); // delay for a bit
 
     alarmBeeping = (alarmOn==1 && strcmp(displayTime, alarmString.c_str()) == 0); 
-    Serial.println("checked Alarm");
-  
+    
     if (alarmBeeping)
     {
       Serial.println("Alarm beeping");
