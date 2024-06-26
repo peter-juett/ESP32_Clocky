@@ -73,6 +73,8 @@ const char* DISPLAY_MSG_ALL = "ALL";
 const char* DISPLAY_MSG_ALL2 = "ALL2";
 const char* DISPLAY_MSG_SCROLL = "Scroll";
 const char* DISPLAY_MSG_DEMO = "Demo";
+const char* DISPLAY_MSG_LIGHT = "Light";
+
 const char* DISPLAY_MSG_SETUP = "Setup";
 
 const char* DISPLAY_MSG_24HR = "24 hr?";
@@ -113,8 +115,10 @@ const int SHOW_HUMIDITY = 4;
 const int SHOW_ALL = 5;
 const int SHOW_ALL2 = 6;
 const int SCROLL_ALL = 7;
-const int DEMO_MODE = 8;
-const int SETUP_MODE = 9;
+const int SHOW_LIGHT = 8;
+const int DEMO_MODE = 9;
+
+const int SETUP_MODE = 10;
 
 const int SETUP_STEP_ALARM = 1;
 const int SETUP_STEP_ALARM_SUBSTEP_0_DISPLAY_ALARM = 0;
@@ -1131,8 +1135,8 @@ void DisplayCurrentMode()
     case DEMO_MODE:
           CentreTextPriority(DISPLAY_MSG_DEMO);
           break;
-    case SETUP_MODE:
-          CentreTextPriority(DISPLAY_MSG_SETUP);
+    case SHOW_LIGHT:
+          CentreTextPriority(DISPLAY_MSG_LIGHT);
           break;
     }
 }
@@ -1258,7 +1262,9 @@ void checkIR() {
     if (irrecv.decode(&results)) {
          
         keyHit =  (isValueInArray(results.value)); //Is it a recognised IR code (from the Clocky remote control)
-        Serial.println                              (results.value);
+        Serial.println(results.value);
+        Serial.println(keyHit);
+        Serial.println(currentMode);
         if(alarmBeeping)
         {
             if (isValueInArray(results.value)) //Is it a recognised IR code (from the Clocky remote control)
@@ -1465,6 +1471,8 @@ void checkIR() {
             SetSaveandDisplayMode(SHOW_ALL2);
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_7])
             SetSaveandDisplayMode(SCROLL_ALL);
+          else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_8])
+            SetSaveandDisplayMode(SHOW_LIGHT);
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_9])
             SetSaveandDisplayMode(DEMO_MODE);
           else if (results.value == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_STAR])
@@ -1505,11 +1513,11 @@ void checkIR() {
               if (currentMode > 0)
                 SetSaveandDisplayMode(currentMode-1);
               else
-                SetSaveandDisplayMode(7);
+                SetSaveandDisplayMode(9);
             }
           else if (results.value  == REMOTE_BUTTONS[current_remote][BUTTON_PRESS_RIGHT])
             {
-              if (currentMode < 7) 
+              if (currentMode < 9) 
                 SetSaveandDisplayMode(currentMode+1);
               else
                 SetSaveandDisplayMode(0);
@@ -1588,7 +1596,12 @@ void DisplayTask(void *pvParameters) {
        CentreText(getHumidity());
        delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
     }
-    else if (currentMode == DEMO_MODE)
+    else if (currentMode == SHOW_LIGHT)
+    {
+      CentreText(String(lightLevel));
+      delay(SCREEN_DELAY_TIME); // delay between scrolls or updates
+   }
+   else if (currentMode == DEMO_MODE)
     {
        Demo();
     }
