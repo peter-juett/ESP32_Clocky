@@ -180,8 +180,6 @@ struct tm timeinfo;
 
 IRrecv irrecv(RECV_PIN);
 
-decode_results results;
-
 WiFiManager wifiManager; // Initialize WiFiManager
 
 TaskHandle_t DisplayTask_Handle, TriggerTask_Handle;
@@ -1258,13 +1256,11 @@ bool isValueInArray(unsigned long value) {
 
 void checkIR() {
     char buffer[10]; // Assuming the number won't exceed 10 characters including the sign and null terminator
+    decode_results results;
 
     if (irrecv.decode(&results)) {
          
         keyHit =  (isValueInArray(results.value)); //Is it a recognised IR code (from the Clocky remote control)
-        Serial.println(results.value);
-        Serial.println(keyHit);
-        Serial.println(currentMode);
         if(alarmBeeping)
         {
             if (isValueInArray(results.value)) //Is it a recognised IR code (from the Clocky remote control)
@@ -1746,8 +1742,8 @@ void TriggerTask(void *pvParameters) {
     {
       motionDetected = false;
       lastMovementTime = millis();
-      Serial.println("Motion detected!");
-      // Handle motion detection event here
+ 
+       // Handle motion detection event here
       if (alarmMotionOn==1 && alarmBeeping)
       {
         alarmOn=0;
@@ -1762,16 +1758,7 @@ void TriggerTask(void *pvParameters) {
     bool isMotionOn = (DisplayMotionOn == DISPLAY_MOTION_ON);
     bool isDarkAndMotionDark = (DisplayMotionOn == DISPLAY_MOTION_DARK && IsDark());
     bool isScreenSaverTimeout = ((millis() - lastMovementTime) > screenSaverTimeout);
-
-  //  Serial.print("DisplayMotionOn");
-  //  Serial.println(DisplayMotionOn);
-
- //   Serial.print("isDarkAndMotionDark");
- //   Serial.println(isDarkAndMotionDark);
-
-
     screenSaver = (isMotionOn || isDarkAndMotionDark) && isScreenSaverTimeout;
-
    }
 }
 
@@ -1791,7 +1778,6 @@ void GetCurrentRemote()
 
 void SetTimezone(String timezone){
   timeZone = timezone;
-  Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
   setenv("TZ",timezone.c_str(),1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
   tzset();
 }
@@ -1823,7 +1809,6 @@ void setup() {
   // Set motionSensor pin as interrupt, assign interrupt function and set RISING mode
   attachInterrupt(digitalPinToInterrupt(PIR_PIN), detectsMovement, RISING);
 
-  Serial.println("Initializing I2C...");
   Wire.begin(SDA_PIN, SCL_PIN);
  
   lightMeter.begin();
