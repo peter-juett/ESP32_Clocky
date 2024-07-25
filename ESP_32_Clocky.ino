@@ -110,7 +110,7 @@ String getDate(bool addPostfix = false)
     strftime(dayPart, sizeof(dayPart), "%e", &timeinfo);
     displayDate = String(dayPart);
 
-    // Format month partc:\Users\peter\OneDrive\Documents\Arduino\libraries\MD_MAX72XX\src\MD_MAX72xx_font.cpp
+    // Format month part
     if (timeinfo.tm_mon == 6 || timeinfo.tm_mon == 7) //For June and July maybe we can get away with 4 chars
     {
       strftime(monthPart, sizeof(monthPart), "%B", &timeinfo);
