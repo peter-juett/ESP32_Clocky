@@ -110,8 +110,8 @@ String getDate(bool addPostfix = false)
     strftime(dayPart, sizeof(dayPart), "%e", &timeinfo);
     displayDate = String(dayPart);
 
-    // Format month part
-    if (timeinfo.tm_mday < 10 && (timeinfo.tm_mon == 6 || timeinfo.tm_mon == 7)) //For early June and July we can get away with 4 chars
+    // Format month partc:\Users\peter\OneDrive\Documents\Arduino\libraries\MD_MAX72XX\src\MD_MAX72xx_font.cpp
+    if (timeinfo.tm_mon == 6 || timeinfo.tm_mon == 7) //For June and July maybe we can get away with 4 chars
     {
       strftime(monthPart, sizeof(monthPart), "%B", &timeinfo);
       monthPart[4]=0;
@@ -165,7 +165,7 @@ void getLight()
   
   lightLevel = lightMeter.readLightLevel();
 
- // Serial.println(lightLevel);
+  Serial.println(lightLevel);
 
   if (lightLevel < LIGHT_LEVEL_LOW)
     mx.control(MD_MAX72XX::INTENSITY, 0);
@@ -1616,7 +1616,7 @@ void TriggerTask(void *pvParameters) {
     }
   
     if (motionDetected) 
-    {
+    { 
       motionDetected = false;
       lastMovementTime = millis();
  
@@ -1669,35 +1669,42 @@ void setup() {
   Serial.begin(9600);
  
   GetSettings();
- 
+    Serial.println("1");
+
   GetAlarmString();
   GetDisplayMode();
- 
+    Serial.println("2");
+
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(PIR_PIN, INPUT_PULLDOWN);
- 
+    Serial.println("3");
+
+  if (!mx.begin())
+    Serial.println("\nMD_MAX72XX initialization failed");
+   Serial.println("4");
+
+  mx.control(MD_MAX72XX::INTENSITY, intensity);
+
   // Set motionSensor pin as interrupt, assign interrupt function and set RISING mode
   attachInterrupt(digitalPinToInterrupt(PIR_PIN), detectsMovement, RISING);
 
   Wire.begin(SDA_PIN, SCL_PIN);
- 
-  lightMeter.begin();
+  while (!lightMeter.begin())
+  {
+    ScrollText("GY30 failed");
+    Serial.println("GY30 failed");
+    delay(1000);
+  }
 
   sht31 = Adafruit_SHT31();
-  Serial.println("Initializing SHT31 sensor...");
-  if (!sht31.begin(0x44)) 
+  while (!sht31.begin(0x44)) 
   {
-    Serial.println("Couldn't find SHT31 sensor, check wiring!");
-    while (1);
+    ScrollText("SHT31 failed");
+    Serial.println("SHT31 failed");
+    delay(1000);
   }
-  
-  if (!mx.begin())
-    Serial.println("\nMD_MAX72XX initialization failed");
-
-   mx.control(MD_MAX72XX::INTENSITY, intensity);
-
-  CentreText("Wi-fi");
  
+  CentreText("Wi-fi");
   wifiManager.autoConnect("Clocky"); // Connect to saved network or create AP
  
   // set notification call-back function
