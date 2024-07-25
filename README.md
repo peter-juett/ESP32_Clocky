@@ -48,7 +48,9 @@ To use Clocky, you will need the following:
 6. Special note - esp32 by Espressif Systems - do not use the latest board - version stay with 2.0.17, otherwise the IR code library will break.
 7. Special note 2 - in MD_MAX72xx_font.cpp in ..libraries\MD_MAX72XX\src - you can get a better ":" for the clock by 
 8. //2, 108, 108,		// 58 - ':' <--comment out this line
-  2, 54, 54,		// 58 - ':' // <--and replace it with this
+  2, 54, 54,		// 58 - ':' // <--and replace it with this  
+  2, 0, 0,		// 32 - 'Space' //Also you can narrow the space by one column too, change from this  
+  1, 0, 		// 32 - 'Space' //to this  
 9. Upload the code to your ESP32 board.
 
 ## Usage
