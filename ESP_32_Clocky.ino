@@ -165,8 +165,6 @@ void getLight()
   
   lightLevel = lightMeter.readLightLevel();
 
-  Serial.println(lightLevel);
-
   if (lightLevel < LIGHT_LEVEL_LOW)
     mx.control(MD_MAX72XX::INTENSITY, 0);
   else

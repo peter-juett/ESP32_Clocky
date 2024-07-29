@@ -44,7 +44,7 @@ const unsigned long REMOTE_BUTTONS[][17] = {
     }
 };
 
-const int current_remote = 0; //TODO - make this configurable
+const int current_remote = 1; //TODO - make this configurable
 const char* BUTTON_PRESS_MSG_DEFAULT = "Unexpected button press";
 
 const char* DISPLAY_MSG_OFF = "Off";
@@ -76,7 +76,7 @@ const int DISPLAY_MOTION_ON = 1;
 const int DISPLAY_MOTION_DARK = 2;
 
 const int LIGHT_LEVEL_DARK = 1;
-const int LIGHT_LEVEL_LOW = 20;
+const int LIGHT_LEVEL_LOW = 15;
 
 const char* DISPLAY_MSG_12_24_HR = "12/24";
 const char* DISPLAY_MSG_WIFI = "Wi-Fi";
