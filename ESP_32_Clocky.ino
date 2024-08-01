@@ -111,7 +111,7 @@ String getDate(bool addPostfix = false)
     displayDate = String(dayPart);
 
     // Format month part
-    if (timeinfo.tm_mon == 6 || timeinfo.tm_mon == 7) //For June and July maybe we can get away with 4 chars
+    if (timeinfo.tm_mon == 5 || timeinfo.tm_mon == 6) //For June and July maybe we can get away with 4 chars
     {
       strftime(monthPart, sizeof(monthPart), "%B", &timeinfo);
       monthPart[4]=0;
